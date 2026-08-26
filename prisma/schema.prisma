@@ -1,0 +1,441 @@
+// Masters Touch Academy — member app data model.
+//
+// Ported from the prototype's in-memory state (designs/Masters Touch Academy.dc.html)
+// and README.md § "Backend: what needs to be built".
+//
+// Two invariants from CLAUDE.md are load-bearing here and must not drift:
+//
+//   1. Tier is an ordinal Int 1–4, not an enum: 1 Community, 2 Pro, 3 Pro+,
+//      4 Crew Leader. Access checks are comparisons (tier >= 2, tier >= 3).
+//   2. Course access = purchased, OR (tier >= 2 AND course.group == cec).
+//      IICRC certification courses stay a la carte at every tier. This must be
+//      enforced server-side; never trust a client-supplied tier.
+
+// Prisma 7: the generator is `prisma-client` with an explicit output, and the
+// datasource carries no url — the connection string lives in prisma.config.ts
+// for the CLI, and reaches the runtime client through a driver adapter.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// People
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String?
+
+  firstName   String
+  lastName    String
+  displayName String?
+  phone       String?
+  company     String?
+  role        String? // job title, e.g. "Lead technician"
+  city        String?
+  website     String?
+  bio         String?
+
+  /// Ordinal 1–4. See the invariant note at the top of this file.
+  tier         Int     @default(1)
+  isOwner      Boolean @default(false)
+  isInstructor Boolean @default(false)
+
+  // Onboarding (4 steps in the prototype)
+  onboardedAt      DateTime?
+  onboardingRole   String?
+  onboardingCerts  String[] @default([])
+  onboardingGoal   String?
+  onboardingExp    String?
+
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastSeenAt      DateTime?
+
+  sessions       Session[]
+  enrollments    Enrollment[]
+  lessonProgress LessonProgress[]
+  quizAttempts   QuizAttempt[]
+  certificates   Certificate[]
+  entitlements   Entitlement[]
+  seatBookings   SeatBooking[]
+  attendance     Attendance[]
+  settings       UserSettings?
+
+  /// Crew the user belongs to as a seat holder.
+  crewId String?
+  crew   Crew?   @relation("CrewMembers", fields: [crewId], references: [id], onDelete: SetNull)
+  /// Crew the user owns (Crew Leader tier).
+  ownedCrew Crew? @relation("CrewOwner")
+
+  taughtCourses Course[] @relation("CourseInstructor")
+
+  @@index([tier])
+  @@index([crewId])
+}
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailProduct       Boolean @default(true)
+  emailCommunity     Boolean @default(true)
+  emailMarketing     Boolean @default(false)
+  notifyInApp        Boolean @default(true)
+  publicProfile      Boolean @default(true)
+  showCertificates   Boolean @default(true)
+  twoFactorEnabled   Boolean @default(false)
+  digestCadence      String  @default("weekly") // off | daily | weekly
+  timezone           String  @default("America/New_York")
+}
+
+/// Server-side sessions. The cookie holds an opaque token; only its hash is
+/// stored, so a database leak does not hand over live sessions.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ip        String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Crew {
+  id      String @id @default(cuid())
+  name    String
+  ownerId String @unique
+  owner   User   @relation("CrewOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  /// Crew Leader includes 5; extra seats are sold in blocks of 5 at $39/seat/mo.
+  seats   Int    @default(5)
+
+  members User[]      @relation("CrewMembers")
+  invites CrewInvite[]
+
+  createdAt DateTime @default(now())
+}
+
+model CrewInvite {
+  id        String   @id @default(cuid())
+  crewId    String
+  crew      Crew     @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  email     String
+  sentAt    DateTime @default(now())
+  acceptedAt DateTime?
+
+  @@unique([crewId, email])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Catalog
+// ─────────────────────────────────────────────────────────────
+
+enum CourseGroup {
+  /// IICRC certification — always sold a la carte, at every tier.
+  iicrc
+  /// Continuing education — included with Pro (tier >= 2) and above.
+  cec
+}
+
+model Course {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  code        String // WRT, CCT, CEC…
+  group       CourseGroup
+  title       String
+  blurb       String
+  description String
+
+  /// Stored in cents to avoid float drift.
+  priceCents     Int
+  priceLiveCents Int?
+
+  hours   Int
+  days    String // "3 days" | "Self-paced"
+  level   String
+  tag     String
+  ceHours Int    @default(0)
+
+  /// Percentage needed to pass the final exam. Prototype default is 80.
+  passingScore Int     @default(80)
+  published    Boolean @default(false)
+
+  instructorId String?
+  instructor   User?   @relation("CourseInstructor", fields: [instructorId], references: [id], onDelete: SetNull)
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  modules         Module[]
+  enrollments     Enrollment[]
+  certificates    Certificate[]
+  entitlements    Entitlement[]
+  scheduledClasses ScheduledClass[]
+  finalExam       Quiz?           @relation("CourseFinalExam")
+
+  @@index([group, published])
+}
+
+model Module {
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title    String
+  /// Explicit ordering — the builder reorders with move-up/move-down.
+  position Int
+
+  lessons Lesson[]
+
+  @@unique([courseId, position])
+  @@index([courseId])
+}
+
+enum LessonType {
+  video
+  text
+  resource
+  quiz
+}
+
+model Lesson {
+  id       String     @id @default(cuid())
+  moduleId String
+  module   Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title    String
+  type     LessonType
+  position Int
+
+  /// Stable key resolved to a Vimeo id server-side after an entitlement check.
+  /// See vimeo-integration.md — a video file URL never reaches the client.
+  assetKey        String?
+  durationSeconds Int?
+  body            String? // text lessons
+  resourceUrl     String? // resource lessons
+
+  quizId String? @unique
+  quiz   Quiz?   @relation("LessonQuiz", fields: [quizId], references: [id], onDelete: SetNull)
+
+  progress LessonProgress[]
+
+  @@unique([moduleId, position])
+  @@index([moduleId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Assessment
+// ─────────────────────────────────────────────────────────────
+
+model Quiz {
+  id    String @id @default(cuid())
+  title String
+
+  /// Set when this quiz is a course's final exam; a pass issues a certificate.
+  finalForCourseId String? @unique
+  finalForCourse   Course? @relation("CourseFinalExam", fields: [finalForCourseId], references: [id], onDelete: Cascade)
+
+  lesson    Lesson?       @relation("LessonQuiz")
+  questions Question[]
+  attempts  QuizAttempt[]
+}
+
+model Question {
+  id       String   @id @default(cuid())
+  quizId   String
+  quiz     Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  prompt   String
+  position Int
+  options  String[]
+  /// Index into `options`. Never sent to the client while an attempt is open.
+  correct  Int
+
+  @@unique([quizId, position])
+}
+
+model QuizAttempt {
+  id     String @id @default(cuid())
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// questionId -> chosen option index.
+  answers       Json
+  score         Int
+  passed        Boolean
+  attemptNumber Int
+  submittedAt   DateTime @default(now())
+
+  @@index([userId, quizId])
+  @@index([quizId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enrolment, entitlement, progress
+// ─────────────────────────────────────────────────────────────
+
+enum EntitlementSource {
+  /// Bought outright — one year of access from the purchase date.
+  purchase
+  /// Granted by an active paid tier (CEC library only).
+  membership
+  /// Given by an owner or admin.
+  grant
+}
+
+/// What a user is actually allowed to open. Written by checkout, membership
+/// changes, and admin grants — never derived on the client.
+model Entitlement {
+  id       String            @id @default(cuid())
+  userId   String
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId String
+  course   Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  source   EntitlementSource
+  grantedAt DateTime         @default(now())
+  /// Null = no expiry (membership entitlements track the subscription instead).
+  expiresAt DateTime?
+
+  @@unique([userId, courseId, source])
+  @@index([userId])
+}
+
+model Enrollment {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  startedAt DateTime  @default(now())
+  completedAt DateTime?
+  /// Denormalised 0–100 for list views; recomputed on lesson completion.
+  percent   Int       @default(0)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+}
+
+model LessonProgress {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  /// Throttled writes from the player's timeupdate handler.
+  seconds   Int      @default(0)
+  percent    Int      @default(0)
+  completed  Boolean  @default(false)
+  completedAt DateTime?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+}
+
+model Certificate {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  /// Public, unguessable id for the shareable/printable view.
+  shareId  String   @unique @default(cuid())
+  issuedAt DateTime @default(now())
+  ceHours  Int
+  score    Int
+
+  @@unique([userId, courseId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Scheduled classes
+// ─────────────────────────────────────────────────────────────
+
+enum ClassMode {
+  hybrid
+  inperson
+  virtual
+}
+
+enum SeatMode {
+  inperson
+  virtual
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+}
+
+/// The class schedule. This is the table that replaces designs/academy-data.js
+/// and the marketing site's inc/data.php — one source of truth once it exists.
+model ScheduledClass {
+  id       String    @id @default(cuid())
+  courseId String
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title    String
+  mode     ClassMode
+
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  /// Human-readable range as shown on the site, e.g. "Sep 9–11, 2026".
+  dateLabel String
+
+  location String
+  note     String?
+
+  seatsTotal        Int
+  inPersonPriceCents Int?
+  virtualPriceCents  Int?
+
+  published Boolean @default(false)
+
+  bookings   SeatBooking[]
+  attendance Attendance[]
+
+  @@index([startDate, published])
+}
+
+model SeatBooking {
+  id      String         @id @default(cuid())
+  classId String
+  class   ScheduledClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode    SeatMode
+  bookedAt DateTime      @default(now())
+  /// What was actually charged, after any tier discount.
+  paidCents Int
+
+  @@unique([classId, userId])
+  @@index([userId])
+}
+
+model Attendance {
+  id      String           @id @default(cuid())
+  classId String
+  class   ScheduledClass   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status  AttendanceStatus
+  markedAt DateTime        @default(now())
+
+  @@unique([classId, userId])
+}
