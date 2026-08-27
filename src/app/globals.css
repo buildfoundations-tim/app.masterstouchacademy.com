@@ -344,3 +344,69 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 @media (max-width: 900px) {
   .course-detail { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Exam ────────────────────────────────────────────────── */
+.question { padding: 20px 22px; margin-bottom: 14px; border: 1px solid var(--border); }
+.question legend {
+  font-size: 15.5px; font-weight: 600; line-height: 1.5;
+  padding: 0 0 12px; display: flex; gap: 10px; align-items: baseline;
+}
+.question__num { font-family: var(--ff-display); font-size: 17px; color: var(--gold); flex-shrink: 0; }
+
+.option {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 10px 12px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--bg);
+  margin-bottom: 8px; cursor: pointer; font-size: 14px; line-height: 1.5;
+}
+.option:hover { border-color: var(--gold); }
+.option:has(input:checked) { border-color: var(--gold-deep); background: var(--surface-tint); }
+.option input { margin-top: 3px; accent-color: var(--gold-deep); flex-shrink: 0; }
+
+.score-ring {
+  width: 118px; height: 118px; margin: 0 auto;
+  border-radius: 50%; border: 3px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--ff-display); font-size: 34px; color: var(--muted);
+}
+.score-ring.is-pass { border-color: var(--success); color: var(--success); }
+
+/* ── Certificate ─────────────────────────────────────────── */
+.certificate {
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 48px 44px;
+  text-align: center;
+}
+.certificate__rule { height: 2px; background: var(--gold); width: 64px; margin: 0 auto; }
+.certificate__eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gold-deep); margin: 22px 0 30px;
+}
+.certificate__intro { font-size: 13.5px; color: var(--muted); }
+.certificate__name {
+  font-family: var(--ff-display); font-weight: 400; font-size: 42px;
+  line-height: 1.15; margin: 8px 0 22px;
+}
+.certificate__course {
+  font-family: var(--ff-display); font-weight: 400; font-size: 27px;
+  line-height: 1.25; margin: 8px 0 30px; color: var(--ink-2);
+}
+.certificate__facts {
+  display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;
+  padding: 22px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  margin-bottom: 22px;
+}
+.certificate__facts dt {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 4px;
+}
+.certificate__facts dd { font-size: 17px; font-weight: 600; }
+.certificate__id { font-size: 11.5px; color: var(--fainter); margin-bottom: 22px; }
+
+@media print {
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .page { padding: 0; max-width: none; }
+  .certificate { border: 0; background: #fff; }
+}
