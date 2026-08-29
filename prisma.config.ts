@@ -14,5 +14,10 @@ export default defineConfig({
   },
   datasource: {
     url: process.env['DATABASE_URL'],
+    // Prisma replays every migration into a throwaway shadow database to detect
+    // drift. `prisma dev` exposes one on the next port up; without pointing at
+    // it, migrate reuses the main database and fails with "type already exists".
+    // Unset in production — hosted Postgres providers handle this themselves.
+    shadowDatabaseUrl: process.env['SHADOW_DATABASE_URL'],
   },
 });

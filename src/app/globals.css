@@ -453,3 +453,33 @@ textarea.input { line-height: 1.6; resize: vertical; }
   .class-row__cta, .admin-row__actions { width: 100%; }
   .admin-row__actions { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ── Membership plans ────────────────────────────────────── */
+.billing-toggle { display: inline-flex; background: var(--surface-tint); border-radius: 24px; padding: 4px; margin-bottom: 22px; }
+.billing-toggle a {
+  font-size: 13.5px; font-weight: 600; padding: 8px 20px;
+  border-radius: 20px; color: var(--muted); white-space: nowrap;
+}
+.billing-toggle a[aria-current='true'] { background: var(--surface-warm); color: var(--ink); }
+
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; align-items: start; }
+.plan {
+  position: relative;
+  background: var(--surface-warm);
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  padding: 28px 24px;
+  display: flex; flex-direction: column;
+}
+.plan--featured { background: var(--dark); border-color: var(--dark); color: #fff; }
+.plan--featured .plan__blurb, .plan--featured .plan__period, .plan--featured .plan__paypal { color: var(--on-dark); }
+.plan--featured .plan__features li { color: #fff; }
+.plan__flag { position: absolute; top: -11px; left: 24px; background: var(--gold); color: var(--ink); }
+.plan__blurb { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin: 6px 0 18px; min-height: 40px; }
+.plan__price { font-size: 40px; font-weight: 700; letter-spacing: -1.2px; line-height: 1.05; }
+.plan__period { font-size: 12.5px; color: var(--muted); margin: 4px 0 18px; }
+.plan__features { list-style: none; display: grid; gap: 8px; margin-bottom: 20px; flex: 1; }
+.plan__features li { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.5; }
+.plan__features li::before { content: '\2713'; color: var(--gold); font-weight: 700; flex-shrink: 0; }
+.plan__paypal { font-size: 11.5px; color: var(--faint); text-align: center; margin-top: 10px; }
+.plan [aria-disabled='true'] { opacity: .6; cursor: default; }

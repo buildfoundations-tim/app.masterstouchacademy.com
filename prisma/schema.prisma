@@ -68,6 +68,7 @@ model User {
   seatBookings   SeatBooking[]
   attendance     Attendance[]
   settings       UserSettings?
+  subscriptions  Subscription[]
 
   /// Crew the user belongs to as a seat holder.
   crewId String?
@@ -438,4 +439,69 @@ model Attendance {
   markedAt DateTime        @default(now())
 
   @@unique([classId, userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Billing (PayPal)
+// ─────────────────────────────────────────────────────────────
+//
+// The rule this section exists to protect: a member's tier is only ever
+// changed by something PayPal told us, verified server-side. Nothing on the
+// return-from-PayPal redirect is trusted — a member can edit that URL.
+
+enum SubscriptionStatus {
+  /// Created at PayPal, member has not approved it yet.
+  approval_pending
+  approved
+  active
+  suspended
+  cancelled
+  expired
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// PayPal's subscription id (I-XXXXXXXXXXXX).
+  paypalSubscriptionId String             @unique
+  paypalPlanId         String
+  status               SubscriptionStatus @default(approval_pending)
+
+  /// The tier this subscription grants while active. Ordinal 1–4.
+  tier     Int
+  interval String // month | year
+
+  priceCents Int
+
+  startedAt        DateTime?
+  currentPeriodEnd DateTime?
+  cancelledAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+/// Every webhook PayPal has delivered, keyed by its transmission id.
+///
+/// PayPal retries on any non-2xx and can redeliver an event it already sent,
+/// so handlers must be idempotent. Inserting here first — and treating a
+/// unique-constraint violation as "already handled" — is what makes them so.
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  transmissionId String   @unique
+  eventId        String
+  eventType      String
+  resourceId     String?
+  payload        Json
+  receivedAt     DateTime @default(now())
+  processedAt    DateTime?
+  error          String?
+
+  @@index([eventType])
+  @@index([resourceId])
 }
