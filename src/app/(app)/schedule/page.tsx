@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { classDiscount, discountedCents, TIER_LABEL, TIER } from '@/lib/access';
+import { classDiscount, discountedCents, TIER_LABEL } from '@/lib/access';
 import { money, dateParts, seatsLabel } from '@/lib/format';
 import { paypalConfigured } from '@/lib/paypal';
 import { startPurchase } from '@/app/(app)/checkout/actions';
