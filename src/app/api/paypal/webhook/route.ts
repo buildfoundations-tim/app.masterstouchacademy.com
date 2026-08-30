@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { readWebhookHeaders, verifyWebhook } from '@/lib/paypal';
 import { syncSubscription } from '@/lib/subscriptions';
+import { settleOrder } from '@/lib/orders';
 
 /**
  * PayPal webhook receiver.
@@ -30,6 +31,8 @@ const HANDLED = new Set([
   'BILLING.SUBSCRIPTION.UPDATED',
   'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
   'PAYMENT.SALE.COMPLETED',
+  'PAYMENT.CAPTURE.COMPLETED',
+  'CHECKOUT.ORDER.APPROVED',
 ]);
 
 export async function POST(request: Request) {
@@ -44,7 +47,12 @@ export async function POST(request: Request) {
   let event: {
     id?: string;
     event_type?: string;
-    resource?: { id?: string; billing_agreement_id?: string; custom_id?: string };
+    resource?: {
+      id?: string;
+      billing_agreement_id?: string;
+      custom_id?: string;
+      supplementary_data?: { related_ids?: { order_id?: string } };
+    };
   };
   try {
     event = JSON.parse(raw);
@@ -86,6 +94,38 @@ export async function POST(request: Request) {
   }
 
   try {
+    // One-time purchases settle through the Orders path. This is the safety
+    // net: if the buyer closes the tab before /checkout/return loads, the
+    // webhook still captures and grants. settleOrder is idempotent, so the two
+    // racing is harmless.
+    if (eventType === 'CHECKOUT.ORDER.APPROVED' || eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+      // On CHECKOUT.ORDER.APPROVED the resource id is the order. On
+      // PAYMENT.CAPTURE.COMPLETED it is the capture, and the order id is on
+      // supplementary_data.
+      const orderId =
+        eventType === 'CHECKOUT.ORDER.APPROVED'
+          ? event.resource?.id
+          : event.resource?.supplementary_data?.related_ids?.order_id;
+
+      if (!orderId) {
+        await db.webhookEvent.update({
+          where: { transmissionId: headers.transmissionId },
+          data: { processedAt: new Date(), error: 'no order id on the event' },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      const settled = await settleOrder(orderId);
+      await db.webhookEvent.update({
+        where: { transmissionId: headers.transmissionId },
+        data: {
+          processedAt: new Date(),
+          error: settled.ok ? null : settled.reason,
+        },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
     // On subscription events the resource id IS the subscription. On
     // PAYMENT.SALE.COMPLETED — the recurring charge — it is billing_agreement_id.
     const subscriptionId =

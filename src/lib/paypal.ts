@@ -304,3 +304,111 @@ export async function verifyWebhook(input: {
     return false;
   }
 }
+
+// ── Orders (one-time purchases) ──────────────────────────────
+
+export type PayPalOrder = {
+  id: string;
+  status: 'CREATED' | 'SAVED' | 'APPROVED' | 'VOIDED' | 'COMPLETED' | 'PAYER_ACTION_REQUIRED';
+  purchase_units?: Array<{
+    custom_id?: string;
+    amount?: { currency_code: string; value: string };
+    payments?: {
+      captures?: Array<{
+        id: string;
+        status: string;
+        amount?: { currency_code: string; value: string };
+      }>;
+    };
+  }>;
+  links?: PayPalLink[];
+};
+
+export type OrderLineItem = {
+  name: string;
+  description?: string;
+  /** Dollars as a string, e.g. "450.00". */
+  value: string;
+};
+
+export async function createOrder(input: {
+  /** Our Order row id — comes back on the capture and the webhook. */
+  customId: string;
+  /** Human-readable reference shown on the PayPal receipt. */
+  invoiceId: string;
+  /** Order total in dollars as a string. Must equal the sum of the items. */
+  total: string;
+  items: OrderLineItem[];
+  returnUrl: string;
+  cancelUrl: string;
+}): Promise<PayPalOrder> {
+  return call('/v2/checkout/orders', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: {
+      intent: 'CAPTURE',
+      purchase_units: [
+        {
+          custom_id: input.customId,
+          invoice_id: input.invoiceId,
+          amount: {
+            currency_code: 'USD',
+            value: input.total,
+            breakdown: {
+              item_total: { currency_code: 'USD', value: input.total },
+            },
+          },
+          items: input.items.map((i) => ({
+            name: i.name.slice(0, 127),
+            description: i.description?.slice(0, 127),
+            quantity: '1',
+            unit_amount: { currency_code: 'USD', value: i.value },
+            category: 'DIGITAL_GOODS',
+          })),
+        },
+      ],
+      application_context: {
+        brand_name: 'Masters Touch Academy',
+        locale: 'en-US',
+        shipping_preference: 'NO_SHIPPING',
+        user_action: 'PAY_NOW',
+        return_url: input.returnUrl,
+        cancel_url: input.cancelUrl,
+      },
+    },
+  });
+}
+
+export async function getOrder(id: string): Promise<PayPalOrder> {
+  return call(`/v2/checkout/orders/${encodeURIComponent(id)}`);
+}
+
+/**
+ * Capture an approved order.
+ *
+ * PayPal answers 422 ORDER_ALREADY_CAPTURED if this runs twice. That is not an
+ * error worth surfacing — it means the money is already taken — so the caller
+ * re-reads the order instead.
+ */
+export async function captureOrder(id: string): Promise<PayPalOrder> {
+  return call(`/v2/checkout/orders/${encodeURIComponent(id)}/capture`, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: {},
+  });
+}
+
+export function isAlreadyCaptured(e: unknown): boolean {
+  if (!(e instanceof PayPalError)) return false;
+  return JSON.stringify(e.body ?? '').includes('ORDER_ALREADY_CAPTURED');
+}
+
+/** Where to send the buyer to approve an order. */
+export function orderApprovalUrl(order: PayPalOrder): string | null {
+  const links = order.links ?? [];
+  return (
+    links.find((l) => l.rel === 'approve')?.href ??
+    links.find((l) => l.rel === 'payer-action')?.href ??
+    null
+  );
+}

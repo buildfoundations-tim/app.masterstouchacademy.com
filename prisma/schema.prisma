@@ -69,6 +69,7 @@ model User {
   attendance     Attendance[]
   settings       UserSettings?
   subscriptions  Subscription[]
+  orders         Order[]
 
   /// Crew the user belongs to as a seat holder.
   crewId String?
@@ -186,6 +187,7 @@ model Course {
   certificates    Certificate[]
   entitlements    Entitlement[]
   scheduledClasses ScheduledClass[]
+  orderItems      OrderItem[]
   finalExam       Quiz?           @relation("CourseFinalExam")
 
   @@index([group, published])
@@ -410,6 +412,7 @@ model ScheduledClass {
 
   bookings   SeatBooking[]
   attendance Attendance[]
+  orderItems OrderItem[]
 
   @@index([startDate, published])
 }
@@ -504,4 +507,79 @@ model WebhookEvent {
 
   @@index([eventType])
   @@index([resourceId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// One-time purchases (PayPal Orders v2)
+// ─────────────────────────────────────────────────────────────
+//
+// Courses and class seats are bought outright rather than subscribed to.
+// The same rule as subscriptions applies: nothing is granted until PayPal
+// confirms the capture, and the amount is computed server-side from the
+// catalog and the member's tier — never taken from the request.
+
+enum OrderStatus {
+  /// Created at PayPal, awaiting the member's approval.
+  created
+  approved
+  completed
+  failed
+  refunded
+}
+
+enum OrderItemKind {
+  course
+  class_seat
+}
+
+model Order {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  paypalOrderId   String  @unique
+  paypalCaptureId String?
+
+  status OrderStatus @default(created)
+
+  /// What we asked PayPal to charge, in cents. Compared against what PayPal
+  /// reports on capture — a mismatch means something went wrong and is
+  /// recorded rather than silently fulfilled.
+  totalCents Int
+
+  items OrderItem[]
+
+  createdAt  DateTime  @default(now())
+  capturedAt DateTime?
+  /// Set when fulfilment ran, so it cannot run twice for one order.
+  fulfilledAt DateTime?
+  error      String?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id      String        @id @default(cuid())
+  orderId String
+  order   Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind    OrderItemKind
+
+  courseId String?
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  classId String?
+  class   ScheduledClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  /// inperson | virtual, for a class seat.
+  seatMode String?
+
+  description String
+  /// List price before any tier discount, for the receipt.
+  listCents   Int
+  /// What was actually charged for this line.
+  unitCents   Int
+  quantity    Int    @default(1)
+
+  @@index([orderId])
 }

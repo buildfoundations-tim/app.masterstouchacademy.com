@@ -3,17 +3,17 @@ import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/auth';
 import { loadCourseForUser, formatDuration } from '@/lib/courses';
-import { TIER_LABEL } from '@/lib/access';
+import { TIER_LABEL, classDiscount, discountedCents } from '@/lib/access';
+import { paypalConfigured } from '@/lib/paypal';
+import { money } from '@/lib/format';
 import { db } from '@/lib/db';
+import { startPurchase } from '@/app/(app)/checkout/actions';
+import { BuyButton } from '@/app/(app)/checkout/buy-button';
 
 export async function generateMetadata({ params }: PageProps<'/classroom/[slug]'>) {
   const { slug } = await params;
   const course = await db.course.findUnique({ where: { slug }, select: { title: true } });
   return { title: course?.title ?? 'Course' };
-}
-
-function money(cents: number): string {
-  return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 }
 
 export default async function CoursePage({ params }: PageProps<'/classroom/[slug]'>) {
@@ -23,6 +23,8 @@ export default async function CoursePage({ params }: PageProps<'/classroom/[slug
   const { slug } = await params;
   const { course, unlocked, lock, progressByLesson, lessons, completedCount, percent, bestAttempt } =
     await loadCourseForUser(slug, user);
+
+  const purchasable = paypalConfigured();
 
   // First lesson not yet completed — what "Resume" should open.
   const nextLesson = lessons.find((l) => !progressByLesson.get(l.id)?.completed) ?? lessons[0];
@@ -163,21 +165,34 @@ export default async function CoursePage({ params }: PageProps<'/classroom/[slug
                     </>
                   )}
                 </p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {/* No checkout exists yet — these route to the marketing site's
-                      enquiry form rather than pretending to sell. */}
-                  <a
+                <div className="paywall-actions">
+                  <BuyButton
+                    action={startPurchase}
+                    fields={{ kind: 'course', courseId: course.id }}
+                    label={`Buy this course — ${money(discountedCents(course.priceCents, user.tier))}`}
                     className="btn btn--dark"
-                    href={`https://masterstouchacademy.com/contact?topic=${
-                      course.group === 'iicrc' ? 'Certification' : 'Membership'
-                    }&course=${encodeURIComponent(course.title)}`}
-                  >
-                    {lock === 'upgrade-or-purchase' ? 'Ask about Pro' : 'Ask about a seat'}
-                  </a>
-                  <a className="btn btn--outline" href="https://masterstouchacademy.com/membership">
-                    Compare plans
-                  </a>
+                    disabled={!purchasable}
+                    disabledLabel="Purchasing is not available yet"
+                  />
+                  {lock === 'upgrade-or-purchase' ? (
+                    <Link className="btn btn--outline" href="/membership">
+                      Or go Pro from $69/mo
+                    </Link>
+                  ) : (
+                    <Link className="btn btn--outline" href="/membership">
+                      Compare plans
+                    </Link>
+                  )}
                 </div>
+                {discountedCents(course.priceCents, user.tier) !== course.priceCents ? (
+                  <p className="faint" style={{ fontSize: 12, marginTop: 10 }}>
+                    List price {money(course.priceCents)} — your {TIER_LABEL[user.tier]} membership
+                    takes {Math.round(classDiscount(user.tier) * 100)}% off.
+                  </p>
+                ) : null}
+                <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+                  A course purchase gives you one year of access.
+                </p>
               </div>
             )}
           </div>

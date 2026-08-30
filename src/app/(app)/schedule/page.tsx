@@ -5,6 +5,9 @@ import { getSessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { classDiscount, discountedCents, TIER_LABEL, TIER } from '@/lib/access';
 import { money, dateParts, seatsLabel } from '@/lib/format';
+import { paypalConfigured } from '@/lib/paypal';
+import { startPurchase } from '@/app/(app)/checkout/actions';
+import { BuyButton } from '@/app/(app)/checkout/buy-button';
 
 export const metadata = { title: 'Class schedule' };
 
@@ -35,6 +38,7 @@ export default async function SchedulePage() {
   ]);
 
   const bookedByClass = new Map(myBookings.map((b) => [b.classId, b]));
+  const purchasable = paypalConfigured();
   const discount = classDiscount(user.tier);
 
   return (
@@ -81,6 +85,7 @@ export default async function SchedulePage() {
             const booking = bookedByClass.get(k.id);
             const inPerson = k.inPersonPriceCents;
             const virtual = k.virtualPriceCents;
+            const full = k._count.bookings >= k.seatsTotal;
 
             return (
               <article key={k.id} className="class-row card">
@@ -128,15 +133,28 @@ export default async function SchedulePage() {
                       {virtual !== null ? (
                         <PriceLine label="Live stream" cents={virtual} tier={user.tier} />
                       ) : null}
-                      {/* No checkout yet — this routes to the enquiry form rather
-                          than pretending to sell a seat. */}
-                      <a
-                        className="btn btn--dark btn--sm btn--block"
-                        style={{ marginTop: 10 }}
-                        href={`https://masterstouchacademy.com/contact?topic=Certification&class=${encodeURIComponent(k.title)}`}
-                      >
-                        Reserve a seat
-                      </a>
+                      <div className="seat-buttons">
+                        {inPerson !== null && k.mode !== 'virtual' ? (
+                          <BuyButton
+                            action={startPurchase}
+                            fields={{ kind: 'class_seat', classId: k.id, seatMode: 'inperson' }}
+                            label={full ? 'Fully booked' : 'Book a classroom seat'}
+                            className="btn btn--dark btn--sm btn--block"
+                            disabled={!purchasable || full}
+                            disabledLabel={full ? 'Fully booked' : 'Booking unavailable'}
+                          />
+                        ) : null}
+                        {virtual !== null && k.mode !== 'inperson' ? (
+                          <BuyButton
+                            action={startPurchase}
+                            fields={{ kind: 'class_seat', classId: k.id, seatMode: 'virtual' }}
+                            label="Book a live-stream seat"
+                            className="btn btn--outline btn--sm btn--block"
+                            disabled={!purchasable}
+                            disabledLabel="Booking unavailable"
+                          />
+                        ) : null}
+                      </div>
                       <Link
                         href={`/classroom/${k.course.slug}`}
                         className="faint"
