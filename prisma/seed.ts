@@ -166,9 +166,20 @@ async function main() {
   console.log('Seeding…');
 
   // ── Owner + demo members ──────────────────────────────────
-  const password = await hash('academy-dev-2026');
+  //
+  // These carry a password that is printed below and written in the docs, so
+  // they must never exist in production. Creating them requires SEED_DEMO_USERS
+  // to be set explicitly — running this against a production database without
+  // it seeds the catalog and nothing else.
+  const seedDemoUsers = process.env.SEED_DEMO_USERS === 'true';
 
-  const tom = await db.user.upsert({
+  if (!seedDemoUsers) {
+    console.log('  users: skipped (set SEED_DEMO_USERS=true for local demo accounts)');
+  }
+
+  const password = await hash(process.env.SEED_DEMO_PASSWORD || 'academy-dev-2026');
+
+  const tom = !seedDemoUsers ? null : await db.user.upsert({
     where: { email: 'tom@masterstouchacademy.com' },
     update: {},
     create: {
@@ -191,7 +202,7 @@ async function main() {
   // Two members at different tiers, so the entitlement rules are visible
   // immediately: the Community member sees the CEC library locked, the Pro
   // member sees it open, and both see IICRC courses locked.
-  const community = await db.user.upsert({
+  const community = !seedDemoUsers ? null : await db.user.upsert({
     where: { email: 'community@example.com' },
     update: {},
     create: {
@@ -206,7 +217,7 @@ async function main() {
     },
   });
 
-  const pro = await db.user.upsert({
+  const pro = !seedDemoUsers ? null : await db.user.upsert({
     where: { email: 'pro@example.com' },
     update: {},
     create: {
@@ -221,7 +232,7 @@ async function main() {
     },
   });
 
-  console.log(`  users: ${[tom, community, pro].length}`);
+  if (seedDemoUsers) console.log(`  users: ${[tom, community, pro].filter(Boolean).length}`);
 
   // ── Courses ───────────────────────────────────────────────
   for (const [i, c] of COURSES.entries()) {
@@ -248,7 +259,7 @@ async function main() {
         ceHours: c.hours,
         published: true,
         sortOrder: i,
-        instructorId: c.group === 'cec' ? tom.id : null,
+        instructorId: c.group === 'cec' ? (tom?.id ?? null) : null,
       },
     });
   }
@@ -357,11 +368,17 @@ async function main() {
   }
   console.log(`  classes: ${CLASSES.length}`);
 
-  console.log('\nDone. Sign in with:');
-  console.log('  tom@masterstouchacademy.com  (owner, tier 4)');
-  console.log('  pro@example.com              (Pro, tier 2)');
-  console.log('  community@example.com        (Community, tier 1)');
-  console.log('  password: academy-dev-2026');
+  if (seedDemoUsers) {
+    console.log('\nDone. Sign in with:');
+    console.log('  tom@masterstouchacademy.com  (owner, tier 4)');
+    console.log('  pro@example.com              (Pro, tier 2)');
+    console.log('  community@example.com        (Community, tier 1)');
+    console.log(`  password: ${process.env.SEED_DEMO_PASSWORD || 'academy-dev-2026'}`);
+  } else {
+    console.log('\nDone. Catalog seeded; no user accounts were created.');
+    console.log('Create the owner account by signing up at /signup, then promote it:');
+    console.log('  npx tsx scripts/make-owner.ts you@example.com');
+  }
 }
 
 main()
