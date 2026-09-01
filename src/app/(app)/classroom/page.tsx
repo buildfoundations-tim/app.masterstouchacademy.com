@@ -11,7 +11,12 @@ function money(cents: number): string {
   return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 }
 
-export default async function ClassroomPage() {
+export default async function ClassroomPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  const { welcome } = await searchParams;
   const user = await getSessionUser();
   if (!user) redirect('/signin');
 
@@ -58,6 +63,23 @@ export default async function ClassroomPage() {
       </header>
 
       <div className="page">
+        {welcome ? (
+          <p className="alert alert--success">
+            <strong>Welcome to the academy.</strong> Your Community membership is live. Check your
+            inbox to confirm your email address — that&rsquo;s where certificates and class
+            reminders go.
+          </p>
+        ) : null}
+
+        {!user.emailVerifiedAt ? (
+          <p className="alert alert--info">
+            Your email address isn&rsquo;t confirmed yet.{' '}
+            <Link href="/verify" style={{ fontWeight: 600, color: 'var(--gold-deep)' }}>
+              Send a new confirmation link
+            </Link>
+          </p>
+        ) : null}
+
         {user.tier < TIER.PRO ? (
           <p className="alert alert--info">
             You&rsquo;re on <strong>{TIER_LABEL[user.tier]}</strong>. Pro membership opens the whole

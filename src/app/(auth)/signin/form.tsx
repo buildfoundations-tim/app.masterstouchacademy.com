@@ -40,9 +40,14 @@ export function SignInForm({
       </div>
 
       <div className="field">
-        <label className="label" htmlFor="password">
-          Password
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+          <label className="label" htmlFor="password">
+            Password
+          </label>
+          <a href="/forgot" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--gold-deep)' }}>
+            Forgot?
+          </a>
+        </div>
         <div style={{ position: 'relative' }}>
           <input
             className="input"

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/auth';
@@ -36,9 +37,9 @@ export default async function SignInPage({
           <h2>Sign in</h2>
           <p className="muted" style={{ marginBottom: 28 }}>
             New here?{' '}
-            <a href="https://masterstouchacademy.com/membership" style={{ color: 'var(--gold-deep)', fontWeight: 600 }}>
+            <Link href="/signup" style={{ color: 'var(--gold-deep)', fontWeight: 600 }}>
               Create a free account
-            </a>
+            </Link>
           </p>
           <SignInForm action={signIn} next={next} />
         </div>

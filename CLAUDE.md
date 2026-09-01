@@ -117,11 +117,14 @@ request to Google.
 
 ## State of the build
 
-**Done**: schema (18 tables), initial migration, seed, access rules, auth, app shell, classroom
-course list with lock states.
+**Done**: schema, migrations, seed, access rules, the full account lifecycle (signup, email
+verification, password reset), the classroom, lesson player and progress, the final exam and
+certificates, the class schedule, owner class admin, and PayPal for both subscriptions and
+one-time purchases.
 
-**Not built**: lesson player and progress writes, quizzes and the final exam, certificates, class
-booking, the 13-section Admin, community, marketplace, consulting, messaging, the AI assistant.
+**Not built**: most of the 13-section Admin (only Classes exists), community, marketplace,
+consulting, messaging, the AI assistant, crew management, and the instructor portal. The sidebar
+links `/admin/members` and `/instructor`, neither of which exists yet — they 404.
 
 **Commerce is entirely absent — there is no checkout.** `Entitlement` rows can only be created by
 seed or by hand until a payment processor is chosen; that is still an open question in

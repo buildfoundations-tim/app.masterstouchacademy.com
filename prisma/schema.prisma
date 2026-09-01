@@ -70,6 +70,7 @@ model User {
   settings       UserSettings?
   subscriptions  Subscription[]
   orders         Order[]
+  tokens         VerificationToken[]
 
   /// Crew the user belongs to as a seat holder.
   crewId String?
@@ -582,4 +583,33 @@ model OrderItem {
   quantity    Int    @default(1)
 
   @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Account lifecycle
+// ─────────────────────────────────────────────────────────────
+
+enum TokenPurpose {
+  email_verification
+  password_reset
+}
+
+/// Single-use, expiring tokens for email verification and password resets.
+///
+/// Only the SHA-256 of the token is stored, exactly as for Session: the raw
+/// value exists in the email and nowhere else, so a database leak cannot be
+/// replayed into account takeover.
+model VerificationToken {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   TokenPurpose
+  tokenHash String       @unique
+  expiresAt DateTime
+  /// Set the moment it is redeemed — a token works exactly once.
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
 }
