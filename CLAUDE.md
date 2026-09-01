@@ -126,10 +126,32 @@ one-time purchases.
 consulting, messaging, the AI assistant, crew management, and the instructor portal. The sidebar
 links `/admin/members` and `/instructor`, neither of which exists yet — they 404.
 
-**Commerce is entirely absent — there is no checkout.** `Entitlement` rows can only be created by
-seed or by hand until a payment processor is chosen; that is still an open question in
-`README.md` § "Known gaps". Sidebar links to `/schedule`, `/certificates`, `/membership`,
-`/instructor`, and `/admin/*` are routed but those pages do not exist yet.
+**Commerce is wired but unconfigured.** PayPal subscriptions and one-time purchases are built and
+tested; nothing can actually be bought until the credentials in `docs/paypal-setup.md` are set.
+Every purchase surface degrades to a disabled button with an explicit warning rather than a
+half-working checkout. `User.tier` is only ever written by `syncSubscription()`, which re-reads
+state from PayPal — nothing else in the codebase sets it.
+
+## Email and the account lifecycle
+
+`src/lib/mail.ts` has three transports chosen by `MAIL_TRANSPORT`: `console` (default — writes the
+message and its links to the server log, sends nothing), `resend` (one HTTPS call, no extra
+dependency), and `smtp` (nodemailer; works with the same mail host the marketing site uses).
+
+The console transport is deliberate: signup, verification, and password reset are fully testable
+before anyone signs up for an email provider. Grep the dev server log for `EMAIL (console` to find
+the link.
+
+Tokens for verification and reset are stored as SHA-256 hashes, exactly like sessions — the raw
+value exists in the email and nowhere else. Single use, expiring (24h verify, 1h reset), and
+issuing a new one supersedes any earlier unused token for that purpose. **A password reset deletes
+every session for that user**, because a reset prompted by a compromise must not leave the attacker
+signed in.
+
+**Signup does not reveal whether an address already has an account.** Both paths show "check your
+email"; a new address gets a verification link, an existing one gets a "you already have an account"
+note addressed to the real owner. Do not "improve" this into an `Email already taken` error — it is
+the same anti-enumeration stance as the sign-in form.
 
 Video is specified but unimplemented: see `../masterstouchacademy.com/vimeo-integration.md`. The
 rule that matters — a video file URL never reaches the client; the server resolves an `assetKey` to
