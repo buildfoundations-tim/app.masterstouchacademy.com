@@ -13,7 +13,8 @@
     "db:push": "prisma db push",
     "typecheck": "tsc --noEmit",
     "check": "tsx scripts/check-access.ts && tsx scripts/check-progress.ts && tsx scripts/check-exam.ts && tsx scripts/check-admin.ts && tsx scripts/check-billing.ts && tsx scripts/check-orders.ts && tsx scripts/check-accounts.ts",
-    "paypal:setup": "tsx scripts/paypal-setup.ts"
+    "paypal:setup": "tsx scripts/paypal-setup.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.1.0",
