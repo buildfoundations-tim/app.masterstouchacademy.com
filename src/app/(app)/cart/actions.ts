@@ -7,10 +7,13 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { centsToValue } from '@/lib/billing';
-import { createOrder, orderApprovalUrl, paypalConfigured } from '@/lib/paypal';
+import { createOrder, orderApprovalUrl, paypalConfigured, createSubscription, approvalUrl } from '@/lib/paypal';
+import { findPlanByKey, paypalPlanId } from '@/lib/billing';
+import { recordPendingSubscription } from '@/lib/subscriptions';
 import {
   addCourseToCart,
   addSeatToCart,
+  addMembershipToCart,
   removeFromCart,
   pricedForCheckout,
 } from '@/lib/cart';
@@ -39,6 +42,10 @@ export async function addToCart(
     const courseId = String(formData.get('courseId') ?? '');
     if (!courseId) return { error: 'Nothing to add.' };
     result = await addCourseToCart(user, courseId);
+  } else if (kind === 'membership') {
+    const planKey = String(formData.get('planKey') ?? '');
+    if (!planKey) return { error: 'Pick a plan.' };
+    result = await addMembershipToCart(user.id, planKey);
   } else if (kind === 'class_seat') {
     const classId = String(formData.get('classId') ?? '');
     const seatMode = String(formData.get('seatMode') ?? '');
@@ -55,6 +62,7 @@ export async function addToCart(
   revalidatePath('/cart');
   revalidatePath('/classroom');
   revalidatePath('/schedule');
+  revalidatePath('/membership');
   return { error: null, added: true };
 }
 
@@ -139,6 +147,79 @@ export async function checkoutCart(
   });
 
   const approve = orderApprovalUrl(remote);
+  if (!approve) return { error: 'PayPal did not return an approval link.' };
+
+  redirect(approve);
+}
+
+
+/**
+ * Start the membership sitting in the cart.
+ *
+ * Separate from checkoutCart because PayPal cannot take a subscription and a
+ * one-off order in one transaction — Subscriptions and Orders are different
+ * APIs. The member approves the membership first; once PayPal reports it
+ * active the tier moves, and the rest of the cart is then genuinely priced at
+ * the rate the cart was already showing.
+ */
+export async function startMembershipFromCart(
+  _prev: CheckoutState,
+  _formData: FormData
+): Promise<CheckoutState> {
+  const user = await getSessionUser();
+  if (!user) redirect('/signin');
+
+  if (!paypalConfigured()) return { error: 'Payments are not configured yet.' };
+
+  const line = await db.cartItem.findFirst({
+    where: { userId: user.id, kind: 'membership' },
+    select: { planKey: true },
+  });
+  if (!line?.planKey) return { error: 'There is no membership in your cart.' };
+
+  const plan = findPlanByKey(line.planKey);
+  if (!plan) return { error: 'That plan is no longer available.' };
+
+  const planId = paypalPlanId(plan.key);
+  if (!planId) return { error: 'That plan is not configured at PayPal yet.' };
+
+  const existing = await db.subscription.findFirst({
+    where: { userId: user.id, status: 'active' },
+    select: { id: true },
+  });
+  if (existing) {
+    return {
+      error:
+        'You already have an active membership. Cancel it before starting a different plan, ' +
+        'or get in touch and we will move you across without a gap.',
+    };
+  }
+
+  const origin = await appOrigin();
+
+  let sub;
+  try {
+    sub = await createSubscription({
+      planId,
+      customId: user.id,
+      // Back to the cart, so the remaining items can be bought at the new rate.
+      returnUrl: `${origin}/cart?membership=started`,
+      cancelUrl: `${origin}/cart?membership=cancelled`,
+      subscriberEmail: user.email,
+      subscriberName: { given_name: user.firstName, surname: user.lastName },
+    });
+  } catch {
+    return { error: 'PayPal could not start that subscription. Please try again.' };
+  }
+
+  await recordPendingSubscription({
+    userId: user.id,
+    paypalSubscriptionId: sub.id,
+    paypalPlanId: planId,
+    planKey: plan.key,
+  });
+
+  const approve = approvalUrl(sub);
   if (!approve) return { error: 'PayPal did not return an approval link.' };
 
   redirect(approve);

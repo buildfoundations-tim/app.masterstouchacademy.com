@@ -6,12 +6,18 @@ import { getCart } from '@/lib/cart';
 import { classDiscount, TIER_LABEL } from '@/lib/access';
 import { paypalConfigured } from '@/lib/paypal';
 import { money } from '@/lib/format';
-import { checkoutCart, removeItem } from './actions';
+import { checkoutCart, removeItem, startMembershipFromCart } from './actions';
 import { CheckoutPanel } from './checkout-panel';
+import { CheckoutButton } from './checkout-button';
 
 export const metadata = { title: 'Cart' };
 
-export default async function CartPage() {
+export default async function CartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ membership?: string }>;
+}) {
+  const { membership: membershipFlag } = await searchParams;
   const user = await getSessionUser();
   if (!user) redirect('/signin');
 
@@ -32,6 +38,17 @@ export default async function CartPage() {
       </header>
 
       <div className="page" style={{ maxWidth: 900 }}>
+        {membershipFlag === 'started' ? (
+          <p className="alert alert--info">
+            Thanks — PayPal is activating your membership. Once it confirms, the prices below drop
+            to the member rate. Refresh in a moment if they have not yet.
+          </p>
+        ) : membershipFlag === 'cancelled' ? (
+          <p className="alert alert--info">
+            The membership was not started, so nothing was charged. It is still in your cart.
+          </p>
+        ) : null}
+
         {cart.lines.length === 0 ? (
           <div className="card" style={{ padding: 34, textAlign: 'center' }}>
             <h2 className="display" style={{ fontSize: 24, marginBottom: 10 }}>
@@ -73,7 +90,14 @@ export default async function CartPage() {
                   </div>
 
                   <div className="cart-line__price">
-                    {line.available ? (
+                    {line.kind === 'membership' ? (
+                      <>
+                        <div style={{ fontSize: 18, fontWeight: 700 }}>{money(line.unitCents)}</div>
+                        <span className="faint" style={{ fontSize: 11.5 }}>
+                          per {line.interval === 'year' ? 'year' : 'month'}
+                        </span>
+                      </>
+                    ) : line.available ? (
                       <>
                         {line.listCents !== line.unitCents ? (
                           <s className="faint" style={{ fontSize: 12.5 }}>
@@ -104,6 +128,16 @@ export default async function CartPage() {
                   Summary
                 </h2>
 
+                {cart.membership ? (
+                  <div className="cart-summary__row cart-summary__row--sub">
+                    <span>{cart.membership.label} membership</span>
+                    <span>
+                      {money(cart.membership.chargeCents)}/
+                      {cart.membership.interval === 'year' ? 'yr' : 'mo'}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="cart-summary__row">
                   <span>
                     {cart.buyableCount} item{cart.buyableCount === 1 ? '' : 's'}
@@ -121,9 +155,17 @@ export default async function CartPage() {
                 ) : null}
 
                 <div className="cart-summary__row cart-summary__row--total">
-                  <span>Total</span>
+                  <span>{cart.membership ? 'One-off total' : 'Total'}</span>
                   <span>{money(cart.totalCents)}</span>
                 </div>
+
+                {cart.membership && cart.membershipSavingCents > 0 ? (
+                  <p className="cart-note">
+                    Prices above are the {TIER_LABEL[cart.pricedAtTier]} rate — adding the
+                    membership saves <strong>{money(cart.membershipSavingCents)}</strong> on this
+                    cart. Start the membership first and the discount applies to the rest.
+                  </p>
+                ) : null}
 
                 {cart.unavailableCount > 0 ? (
                   <p className="alert alert--info" style={{ marginTop: 14, marginBottom: 0, fontSize: 12.5 }}>
@@ -131,6 +173,21 @@ export default async function CartPage() {
                     bought right now and {cart.unavailableCount === 1 ? 'is' : 'are'} not included in
                     the total.
                   </p>
+                ) : null}
+
+                {cart.membership ? (
+                  <div className="membership-first">
+                    <p className="faint" style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 10 }}>
+                      A membership is billed on a schedule, so PayPal takes it as a separate
+                      transaction from one-off items. Start it first — you will come back here to
+                      buy the rest at the member rate.
+                    </p>
+                    <CheckoutButton
+                      action={startMembershipFromCart}
+                      disabled={!purchasable}
+                      label={`Start ${cart.membership.label} — ${money(cart.membership.chargeCents)}/${cart.membership.interval === 'year' ? 'yr' : 'mo'}`}
+                    />
+                  </div>
                 ) : null}
 
                 <div style={{ marginTop: 16 }}>

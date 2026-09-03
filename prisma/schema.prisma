@@ -629,12 +629,20 @@ model VerificationToken {
 // Server-side rather than a cookie: members sign in on the truck and again at
 // the desk, and an abandoned cart is worth something to the owner.
 
+enum CartItemKind {
+  course
+  class_seat
+  /// A membership plan. Checks out through PayPal's Subscriptions API, which
+  /// cannot be combined with an Orders payment — see docs/roadmap.md.
+  membership
+}
+
 model CartItem {
   id     String @id @default(cuid())
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  kind OrderItemKind
+  kind CartItemKind
 
   courseId String?
   course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -645,11 +653,17 @@ model CartItem {
   /// inperson | virtual, for a class seat.
   seatMode String?
 
+  /// Which membership plan, for a membership line — e.g. 'pro-monthly'.
+  /// Resolved against PLANS in src/lib/billing.ts.
+  planKey String?
+
   addedAt DateTime @default(now())
 
   /// One line per course. A member cannot buy the same course twice.
   @@unique([userId, courseId])
   /// One seat per class — the format can be changed, not doubled up.
   @@unique([userId, classId])
+  /// At most one membership line; choosing another replaces it.
+  @@unique([userId, kind, planKey])
   @@index([userId])
 }

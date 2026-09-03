@@ -15,10 +15,11 @@
  */
 import { db } from '@/lib/db';
 import { pricePurchase, type PricedLine } from '@/lib/pricing';
+import { findPlanByKey, type Plan } from '@/lib/billing';
 
 export type CartLine = {
   id: string;
-  kind: 'course' | 'class_seat';
+  kind: 'course' | 'class_seat' | 'membership';
   /** Priced and buyable right now. */
   available: boolean;
   /** Why not, when unavailable — shown to the member. */
@@ -30,10 +31,25 @@ export type CartLine = {
   courseSlug?: string;
   classId?: string;
   seatMode?: string;
+  /** Set on a membership line. */
+  planKey?: string;
+  /** Charged by PayPal separately, on its own schedule. */
+  recurring?: boolean;
+  interval?: string;
 };
 
 export type CartView = {
   lines: CartLine[];
+  /** The membership line, if one is in the cart. */
+  membership: (Plan & { lineId: string }) | null;
+  /**
+   * The tier the other lines are priced at. Equal to the member's current tier
+   * unless a membership is in the cart, in which case it is the tier that
+   * membership would grant — so the cart shows what the bundle actually costs.
+   */
+  pricedAtTier: number;
+  /** What the discount would be worth if the membership is taken first. */
+  membershipSavingCents: number;
   /** Buyable lines only. */
   subtotalListCents: number;
   totalCents: number;
@@ -42,7 +58,18 @@ export type CartView = {
   unavailableCount: number;
 };
 
-/** Read the cart, pricing every line against the catalog as it stands now. */
+/**
+ * Read the cart, pricing every line against the catalog as it stands now.
+ *
+ * If a membership is in the cart, the other lines are priced at the tier that
+ * membership would grant rather than the tier the member holds today. That is
+ * the point of putting it in the cart: a course bought alongside Pro should
+ * show the Pro price, not the price they would pay without it.
+ *
+ * The member is never charged that price by accident. pricedForCheckout()
+ * prices against their ACTUAL tier, which only moves once PayPal reports the
+ * subscription active — so the discount is real by the time it applies.
+ */
 export async function getCart(user: { id: string; tier: number }): Promise<CartView> {
   const items = await db.cartItem.findMany({
     where: { userId: user.id },
@@ -53,12 +80,37 @@ export async function getCart(user: { id: string; tier: number }): Promise<CartV
     },
   });
 
+  const membershipItem = items.find((i) => i.kind === 'membership');
+  const plan = membershipItem?.planKey ? findPlanByKey(membershipItem.planKey) : undefined;
+
+  // Price against the better of what they hold and what the cart would grant.
+  // Never below their current tier — taking a cheaper plan than the one they
+  // already pay for must not raise the price of everything else.
+  const pricedAtTier = plan ? Math.max(user.tier, plan.tier) : user.tier;
+  const pricingUser = { id: user.id, tier: pricedAtTier };
+
   const lines: CartLine[] = [];
 
   for (const item of items) {
+    if (item.kind === 'membership') {
+      if (!plan) continue; // plan key no longer recognised — skip silently
+      lines.push({
+        id: item.id,
+        kind: 'membership',
+        available: true,
+        description: `${plan.label} membership`,
+        listCents: plan.chargeCents,
+        unitCents: plan.chargeCents,
+        planKey: plan.key,
+        recurring: true,
+        interval: plan.interval,
+      });
+      continue;
+    }
+
     const priced = item.kind === 'course'
-      ? await pricePurchase(user, { kind: 'course', courseId: item.courseId! })
-      : await pricePurchase(user, {
+      ? await pricePurchase(pricingUser, { kind: 'course', courseId: item.courseId! })
+      : await pricePurchase(pricingUser, {
           kind: 'class_seat',
           classId: item.classId!,
           seatMode: item.seatMode === 'inperson' ? 'inperson' : 'virtual',
@@ -92,16 +144,54 @@ export async function getCart(user: { id: string; tier: number }): Promise<CartV
     }
   }
 
-  const buyable = lines.filter((l) => l.available);
+  // The membership is billed by PayPal on its own schedule, so it is not part
+  // of the one-off total. Keeping the two apart is what stops the cart implying
+  // a single charge that PayPal cannot actually take.
+  const oneOff = lines.filter((l) => l.available && l.kind !== 'membership');
+
+  // What the membership is worth on this cart, had they not taken it.
+  let membershipSavingCents = 0;
+  if (plan && pricedAtTier !== user.tier) {
+    const atCurrentTier = { id: user.id, tier: user.tier };
+    for (const item of items) {
+      if (item.kind === 'membership') continue;
+      const before = item.kind === 'course'
+        ? await pricePurchase(atCurrentTier, { kind: 'course', courseId: item.courseId! })
+        : await pricePurchase(atCurrentTier, {
+            kind: 'class_seat',
+            classId: item.classId!,
+            seatMode: item.seatMode === 'inperson' ? 'inperson' : 'virtual',
+          });
+      if (before.ok) membershipSavingCents += before.line.unitCents;
+    }
+    membershipSavingCents -= oneOff.reduce((a, l) => a + l.unitCents, 0);
+    if (membershipSavingCents < 0) membershipSavingCents = 0;
+  }
 
   return {
     lines,
-    subtotalListCents: buyable.reduce((a, l) => a + l.listCents, 0),
-    totalCents: buyable.reduce((a, l) => a + l.unitCents, 0),
-    savingCents: buyable.reduce((a, l) => a + (l.listCents - l.unitCents), 0),
-    buyableCount: buyable.length,
-    unavailableCount: lines.length - buyable.length,
+    membership: plan && membershipItem ? { ...plan, lineId: membershipItem.id } : null,
+    pricedAtTier,
+    membershipSavingCents,
+    subtotalListCents: oneOff.reduce((a, l) => a + l.listCents, 0),
+    totalCents: oneOff.reduce((a, l) => a + l.unitCents, 0),
+    savingCents: oneOff.reduce((a, l) => a + (l.listCents - l.unitCents), 0),
+    buyableCount: oneOff.length,
+    unavailableCount: lines.filter((l) => !l.available).length,
   };
+}
+
+/** Put a membership plan in the cart, replacing any already there. */
+export async function addMembershipToCart(
+  userId: string,
+  planKey: string
+): Promise<AddResult> {
+  const plan = findPlanByKey(planKey);
+  if (!plan) return { ok: false, reason: 'That plan is not available.' };
+
+  await db.cartItem.deleteMany({ where: { userId, kind: 'membership' } });
+  await db.cartItem.create({ data: { userId, kind: 'membership', planKey: plan.key } });
+  return { ok: true };
 }
 
 /** Number of items, for the top-bar badge. Cheap — no pricing. */
@@ -183,11 +273,17 @@ export async function clearCart(userId: string): Promise<void> {
 }
 
 /**
- * The lines to actually charge for, priced fresh.
+ * The lines to actually charge for, priced fresh against the member's ACTUAL
+ * tier — not the prospective one the cart displays.
  *
- * Called at checkout rather than reusing what was rendered: the page may have
- * been open for an hour, and the total the member is sent to PayPal with must
- * be the one computed now.
+ * This is the safety on the whole membership-in-cart idea. The cart may show a
+ * course at the Pro price because Pro is sitting in the cart beside it, but
+ * nothing is charged at that price until PayPal reports the subscription active
+ * and the tier genuinely moves. Showing a discount is not the same as granting
+ * one.
+ *
+ * Also re-priced rather than reusing what was rendered: the page may have been
+ * open for an hour.
  */
 export async function pricedForCheckout(user: {
   id: string;
@@ -202,6 +298,11 @@ export async function pricedForCheckout(user: {
   const skipped: string[] = [];
 
   for (const item of items) {
+    // A membership is not an order line — it checks out through the
+    // Subscriptions API separately. Including it here would put a recurring
+    // charge into a one-off capture.
+    if (item.kind === 'membership') continue;
+
     const priced = item.kind === 'course'
       ? await pricePurchase(user, { kind: 'course', courseId: item.courseId! })
       : await pricePurchase(user, {

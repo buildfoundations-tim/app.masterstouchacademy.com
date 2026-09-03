@@ -3,6 +3,8 @@
 import { useActionState } from 'react';
 
 import type { CheckoutState } from './actions';
+import { addToCart } from '@/app/(app)/cart/actions';
+import { AddToCartButton } from '@/app/(app)/cart/add-button';
 
 type PlanCard = {
   key: string;
@@ -103,6 +105,21 @@ export function PlanPicker({
                 </button>
               </form>
             )}
+
+            {!plan.isCurrent && plan.purchasable ? (
+              <div className="plan__cart">
+                <AddToCartButton
+                  action={addToCart}
+                  fields={{ kind: 'membership', planKey: plan.key }}
+                  label="Add to cart instead"
+                  className="btn btn--outline btn--sm btn--block"
+                />
+                <p className="faint" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5 }}>
+                  Buying courses too? Add the membership to your cart and everything else is priced
+                  at the member rate.
+                </p>
+              </div>
+            ) : null}
 
             <p className="plan__paypal">Secure checkout via PayPal</p>
           </div>

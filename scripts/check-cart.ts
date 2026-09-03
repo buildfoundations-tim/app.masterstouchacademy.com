@@ -12,7 +12,7 @@ import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import 'dotenv/config';
 
-import { getCart, addCourseToCart, addSeatToCart, removeFromCart, clearCart, pricedForCheckout } from '../src/lib/cart';
+import { getCart, addCourseToCart, addSeatToCart, addMembershipToCart, removeFromCart, clearCart, pricedForCheckout } from '../src/lib/cart';
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -109,6 +109,46 @@ async function main() {
   const otherUser = await db.user.findFirstOrThrow({ where: { email: { not: member.email } } });
   await removeFromCart(otherUser.id, cart.lines[0].id);
   check('line survives a removal scoped to someone else', (await getCart(tier1)).lines.length, 1);
+
+  console.log('\nA membership in the cart re-prices everything else:');
+  await clearCart(member.id);
+  await db.user.update({ where: { id: member.id }, data: { tier: 1 } });
+  const t1 = { id: member.id, tier: 1 };
+
+  await addCourseToCart(t1, wrt.id);
+  cart = await getCart(t1);
+  check('WRT at list for a Community member', cart.totalCents, 45000);
+  check('no membership line yet', cart.membership, null);
+  check('priced at tier 1', cart.pricedAtTier, 1);
+
+  check('add Pro monthly', (await addMembershipToCart(member.id, 'pro-monthly')).ok, true);
+  cart = await getCart(t1);
+  check('membership line appears', cart.membership?.key, 'pro-monthly');
+  check('it is recurring, not a one-off line', cart.lines.find(l => l.kind === 'membership')?.recurring, true);
+  check('other lines now priced at tier 2', cart.pricedAtTier, 2);
+  check('WRT drops to the Pro price', cart.totalCents, Math.round(45000 * 0.9));
+  check('the saving is reported', cart.membershipSavingCents, 45000 - Math.round(45000 * 0.9));
+
+  console.log('\nThe membership is never part of the one-off charge:');
+  const coM = await pricedForCheckout(t1);
+  check('only the course goes to the Orders API', coM.lines.length, 1);
+  check(
+    'and at the TRUE tier, not the prospective one',
+    coM.totalCents,
+    45000
+  );
+
+  console.log('\nA higher plan wins; a lower one never raises prices:');
+  await addMembershipToCart(member.id, 'crew-monthly');
+  cart = await getCart(t1);
+  check('replaced, still one membership', cart.lines.filter(l => l.kind === 'membership').length, 1);
+  check('Crew Leader prices at tier 4', cart.pricedAtTier, 4);
+  check('WRT at 20% off', cart.totalCents, Math.round(45000 * 0.8));
+
+  // A Pro member adding a Pro plan must not be re-priced downward.
+  await addMembershipToCart(member.id, 'pro-monthly');
+  cart = await getCart({ id: member.id, tier: 3 });
+  check('an existing Pro+ member keeps their better rate', cart.pricedAtTier, 3);
 
   // Reset.
   await clearCart(member.id);
