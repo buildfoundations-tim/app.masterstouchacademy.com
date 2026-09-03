@@ -112,22 +112,9 @@ export function Sidebar({
         <div className="sidebar__group">Account</div>
         {ACCOUNT.map(renderLink)}
 
-        {isInstructor ? (
-          <>
-            <div className="sidebar__group">Teaching</div>
-            {renderLink({
-              href: '/instructor',
-              label: 'My courses',
-              icon: icon(
-                <>
-                  <path d="M12 3l9 5-9 5-9-5 9-5z" />
-                  <path d="M21 8v6" />
-                  <path d="M7 10.5V16c0 1.5 2.2 3 5 3s5-1.5 5-3v-5.5" />
-                </>
-              ),
-            })}
-          </>
-        ) : null}
+        {/* The instructor portal is not built yet. The link lived here before
+            the page did and 404'd — a nav entry is a promise, so it stays out
+            until /instructor exists. See docs/roadmap.md, phase 5. */}
 
         {isOwner ? (
           <>
@@ -142,17 +129,7 @@ export function Sidebar({
                 </>
               ),
             })}
-            {renderLink({
-              href: '/admin/members',
-              label: 'Members',
-              icon: icon(
-                <>
-                  <circle cx="9" cy="8" r="3.2" />
-                  <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
-                  <path d="M16 5.5a3 3 0 010 5.8" />
-                </>
-              ),
-            })}
+            {/* Admin → Members is phase 2; the link 404'd until then. */}
           </>
         ) : null}
       </nav>

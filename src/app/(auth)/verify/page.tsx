@@ -73,7 +73,7 @@ export default async function VerifyPage({
                 {state === 'expired'
                   ? 'That link expired'
                   : state === 'used'
-                    ? 'That link was already used'
+                    ? 'A newer link replaced this one'
                     : state === 'invalid'
                       ? 'That link is not valid'
                       : 'Confirm your email'}
@@ -81,7 +81,9 @@ export default async function VerifyPage({
               <p className="muted" style={{ marginBottom: 22, lineHeight: 1.7 }}>
                 {state === 'no-token'
                   ? 'Open the link from the email we sent you. If it never arrived, send a new one.'
-                  : 'Verification links work once and expire after 24 hours. Send yourself a fresh one.'}
+                  : state === 'used'
+                    ? 'Requesting another email replaces the previous link, so only the most recent one works. Open the newest email in your inbox — or send a fresh one below.'
+                    : 'Verification links work once and expire after 24 hours. Send yourself a fresh one.'}
               </p>
 
               {user ? (
