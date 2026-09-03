@@ -93,6 +93,23 @@ export async function consumeToken(token: string, purpose: TokenPurpose): Promis
 
 // ── The two emails this app sends ────────────────────────────
 
+/**
+ * Send, and fail loudly if it did not go.
+ *
+ * sendMail() reports failure by RETURNING { ok: false }, never by throwing.
+ * Awaiting it without checking swallowed every SMTP error: signup succeeded,
+ * nothing was logged, and no email arrived — indistinguishable from success.
+ * Callers wrap these in .catch() to log, so throwing is what makes that work.
+ */
+async function sendOrThrow(msg: Parameters<typeof sendMail>[0]): Promise<void> {
+  const result = await sendMail(msg);
+  if (!result.ok) {
+    throw new Error(
+      `mail send failed via ${result.transport}: ${result.error ?? 'unknown error'}`
+    );
+  }
+}
+
 export async function sendVerificationEmail(user: {
   id: string;
   email: string;
@@ -101,7 +118,7 @@ export async function sendVerificationEmail(user: {
   const token = await issueToken(user.id, 'email_verification');
   const link = `${await appOrigin()}/verify?token=${encodeURIComponent(token)}`;
 
-  await sendMail({
+  await sendOrThrow({
     to: user.email,
     subject: 'Confirm your email — Masters Touch Academy',
     text:
@@ -121,7 +138,7 @@ export async function sendPasswordResetEmail(user: {
   const token = await issueToken(user.id, 'password_reset');
   const link = `${await appOrigin()}/reset?token=${encodeURIComponent(token)}`;
 
-  await sendMail({
+  await sendOrThrow({
     to: user.email,
     subject: 'Reset your password — Masters Touch Academy',
     text:
@@ -146,7 +163,7 @@ export async function sendAccountExistsEmail(user: {
   firstName: string;
 }): Promise<void> {
   const origin = await appOrigin();
-  await sendMail({
+  await sendOrThrow({
     to: user.email,
     subject: 'You already have an account — Masters Touch Academy',
     text:

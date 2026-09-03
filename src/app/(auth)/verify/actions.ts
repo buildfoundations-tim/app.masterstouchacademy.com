@@ -30,7 +30,10 @@ export async function resendVerification(
   // leave a trail of live keys in the inbox.
   try {
     await sendVerificationEmail(user);
-  } catch {
+  } catch (e) {
+    // Log the real reason. The member gets a vague message on purpose, but
+    // discarding it entirely is what made a broken SMTP setup invisible.
+    console.error('[mail] resend verification failed for', user.email, e);
     return { error: 'We could not send that just now. Try again in a moment.' };
   }
 
