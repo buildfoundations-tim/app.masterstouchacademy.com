@@ -46,3 +46,6 @@ next-env.d.ts
 
 # ...but keep the template, so required env vars are discoverable.
 !.env.example
+
+.vercel
+.env*

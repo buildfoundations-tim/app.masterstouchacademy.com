@@ -10,8 +10,10 @@
  * They are never printed; this script only ever echoes variable NAMES.
  *
  * Prerequisites, run once each:
- *     npx vercel login
- *     npx vercel link          (choose the app-masterstouchacademy-com-43ch project)
+ *     node node_modules/vercel/dist/index.js login
+ *     node node_modules/vercel/dist/index.js link   (pick app-masterstouchacademy-com-43ch)
+ *
+ * Those avoid npx.cmd, which PowerShell's execution policy blocks.
  *
  * Then:
  *     node scripts/push-env-to-vercel.mjs "<POOLED NEON CONNECTION STRING>"
@@ -23,6 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { createRequire } from 'node:module';
 
 const databaseUrl = process.argv[2];
 
@@ -38,11 +41,20 @@ if (!/^postgres(ql)?:\/\//.test(databaseUrl)) {
   console.error('That does not look like a Postgres connection string.');
   process.exit(1);
 }
+// Reject the example string from the docs. Setting it would "succeed" and
+// leave production pointing at a host that does not exist.
+if (/PASSWORD@|ep-xxxx|<.*>/.test(databaseUrl)) {
+  console.error('That is the placeholder from the instructions, not your real connection string.');
+  console.error('Get the real one: Neon dashboard → your project → Connection string → Pooled.');
+  console.error('It contains your actual password and a real endpoint id.');
+  process.exit(1);
+}
+
 if (!databaseUrl.includes('-pooler')) {
   console.warn('WARNING: that string has no "-pooler" in the host.');
   console.warn('Serverless functions need the POOLED endpoint or they will exhaust connections.');
   console.warn('Continuing anyway in 3 seconds — Ctrl+C to stop.\n');
-  execFileSync(process.execPath, ['-e', 'setTimeout(()=>{},3000)']);
+  execFileSync(process.execPath, ['-e', 'setTimeout(()=>{},3000)'], { stdio: 'ignore' });
 }
 
 // ── Read the local .env ──────────────────────────────────────
@@ -85,10 +97,17 @@ if (missing.length) {
 }
 
 // ── Push ─────────────────────────────────────────────────────
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+// Invoke the Vercel CLI's JavaScript entry point with node directly.
+//
+// The obvious `npx vercel …` does not work here: Node 20+ refuses to spawn
+// .cmd/.bat files (CVE-2024-27980), which surfaces as "spawnSync npx.cmd
+// EINVAL", and the usual workaround — shell:true — concatenates arguments
+// without escaping them. Going straight to the .js file avoids the shell, the
+// .cmd wrapper, and PowerShell's execution policy in one move.
+const vercelCli = createRequire(import.meta.url).resolve('vercel/dist/index.js');
 
 function run(args, input) {
-  return execFileSync(npx, ['vercel', ...args], {
+  return execFileSync(process.execPath, [vercelCli, ...args], {
     input,
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -126,13 +145,13 @@ console.log(`\n${ok} set, ${failed} failed.`);
 
 if (failed === 0) {
   console.log('\nNow redeploy so the new values are picked up:');
-  console.log('  npx vercel --prod');
+  console.log('  node node_modules/vercel/dist/index.js --prod');
   console.log('\nThen check:');
   console.log('  curl https://app.masterstouchacademy.com/api/health');
 } else {
   console.log('\nIf everything failed, you are probably not logged in or linked:');
-  console.log('  npx vercel login');
-  console.log('  npx vercel link');
+  console.log('  node node_modules/vercel/dist/index.js login');
+  console.log('  node node_modules/vercel/dist/index.js link');
 }
 
 console.log('\nNote: a fresh AUTH_SECRET was generated. Any existing sessions will be invalid.');
