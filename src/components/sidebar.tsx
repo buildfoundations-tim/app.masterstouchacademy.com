@@ -63,6 +63,17 @@ const MAIN: Item[] = [
 
 const ACCOUNT: Item[] = [
   {
+    href: '/orders',
+    label: 'Orders',
+    icon: icon(
+      <>
+        <path d="M6 2h9l4 4v16H6z" />
+        <path d="M14 2v5h5" />
+        <path d="M9 13h7M9 17h5" />
+      </>
+    ),
+  },
+  {
     href: '/membership',
     label: 'Membership',
     icon: icon(
@@ -141,6 +152,15 @@ export function Sidebar({
                 <>
                   <rect x="3" y="5" width="18" height="16" rx="2" />
                   <path d="M3 10h18" />
+                </>
+              ),
+            })}
+            {renderLink({
+              href: '/admin/orders',
+              label: 'Orders',
+              icon: icon(
+                <>
+                  <path d="M3 6h18M3 12h18M3 18h13" />
                 </>
               ),
             })}
