@@ -539,3 +539,11 @@ textarea.input { line-height: 1.6; resize: vertical; }
   .cart-line { flex-direction: column; gap: 12px; }
   .cart-line__price { text-align: left; justify-items: start; }
 }
+
+.checkout-alt { margin-top: 10px; }
+.checkout-alt summary {
+  font-size: 12px; color: var(--faint); cursor: pointer;
+  list-style: none; text-align: center;
+}
+.checkout-alt summary::-webkit-details-marker { display: none; }
+.checkout-alt summary:hover { color: var(--ink); }

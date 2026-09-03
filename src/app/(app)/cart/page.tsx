@@ -7,7 +7,7 @@ import { classDiscount, TIER_LABEL } from '@/lib/access';
 import { paypalConfigured } from '@/lib/paypal';
 import { money } from '@/lib/format';
 import { checkoutCart, removeItem } from './actions';
-import { CheckoutButton } from './checkout-button';
+import { CheckoutPanel } from './checkout-panel';
 
 export const metadata = { title: 'Cart' };
 
@@ -18,6 +18,7 @@ export default async function CartPage() {
   const cart = await getCart(user);
   const discount = classDiscount(user.tier);
   const purchasable = paypalConfigured();
+  const paypalClientId = process.env.PAYPAL_CLIENT_ID ?? null;
 
   return (
     <>
@@ -133,8 +134,9 @@ export default async function CartPage() {
                 ) : null}
 
                 <div style={{ marginTop: 16 }}>
-                  <CheckoutButton
+                  <CheckoutPanel
                     action={checkoutCart}
+                    clientId={paypalClientId}
                     disabled={!purchasable || cart.buyableCount === 0}
                     label={
                       cart.buyableCount === 0
