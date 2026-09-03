@@ -73,10 +73,23 @@ export async function GET() {
     authSecretSet: Boolean(process.env.AUTH_SECRET),
   };
 
+  // Vercel injects these itself. If they are present but ours are not, the
+  // variables are on a different project or scope — not simply unset. The
+  // commit sha also identifies exactly which build is answering, which is the
+  // only reliable way to tell a redeploy actually took effect.
+  const platform = {
+    onVercel: Boolean(process.env.VERCEL),
+    vercelEnv: process.env.VERCEL_ENV ?? null,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+    // A count, never the names or values — enough to distinguish "no
+    // environment at all" from "our variables specifically are missing".
+    totalEnvVars: Object.keys(process.env).length,
+  };
+
   const ready = database.status === 'ok' && app.authSecretSet;
 
   return NextResponse.json(
-    { ready, database, paypal, mail, app },
+    { ready, database, paypal, mail, app, platform },
     { status: ready ? 200 : 503 }
   );
 }
