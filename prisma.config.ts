@@ -18,6 +18,9 @@ export default defineConfig({
     // drift. `prisma dev` exposes one on the next port up; without pointing at
     // it, migrate reuses the main database and fails with "type already exists".
     // Unset in production — hosted Postgres providers handle this themselves.
-    shadowDatabaseUrl: process.env['SHADOW_DATABASE_URL'],
+    // `|| undefined` rather than a bare read: Prisma rejects an empty string
+    // with P1013 instead of treating it as unset, and an empty value is exactly
+    // what a hosting platform hands you for a variable that is not configured.
+    shadowDatabaseUrl: process.env['SHADOW_DATABASE_URL'] || undefined,
   },
 });

@@ -43,21 +43,20 @@ if (!direct) {
   );
 }
 
+const env = { ...process.env, DATABASE_URL: direct ?? process.env.DATABASE_URL };
+
+// The shadow database is a local-development concept — a dev value here would
+// point migrate at a machine the build cannot reach. It has to be *absent*:
+// prisma.config.ts passes the variable straight through, and Prisma rejects an
+// empty string (P1013) rather than treating it as unset.
+delete env.SHADOW_DATABASE_URL;
+
 const result = spawnSync(
   process.execPath,
   // Resolved rather than spawned as `npx prisma`: npx.cmd is unreliable on
   // Windows and adds a process for nothing.
   [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'],
-  {
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      DATABASE_URL: direct ?? process.env.DATABASE_URL,
-      // The shadow database is a local-development concept. Leaving a dev value
-      // set here would send migrate at a machine that is not reachable.
-      SHADOW_DATABASE_URL: '',
-    },
-  }
+  { stdio: 'inherit', env }
 );
 
 process.exit(result.status ?? 1);
