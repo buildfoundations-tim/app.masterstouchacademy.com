@@ -55,6 +55,10 @@ model User {
   onboardingExp    String?
 
   emailVerifiedAt DateTime?
+  /// When the member last cleared their notification list. Notices are derived
+  /// from real records rather than stored, so this one timestamp is the whole
+  /// read/unread model: anything that happened after it is unread.
+  notificationsReadAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   lastSeenAt      DateTime?
@@ -557,6 +561,16 @@ model Order {
   capturedAt DateTime?
   /// Set when fulfilment ran, so it cannot run twice for one order.
   fulfilledAt DateTime?
+
+  /// Set when PayPal reports a refund against this order's capture.
+  refundedAt   DateTime?
+  /// How much came back, in cents. Compared against totalCents to tell a full
+  /// refund (access is withdrawn) from a partial one (it is not — that needs a
+  /// human decision).
+  refundedCents Int?
+  /// Set when access was withdrawn, so a redelivered webhook cannot do it twice.
+  revokedAt    DateTime?
+
   error      String?
 
   @@index([userId])

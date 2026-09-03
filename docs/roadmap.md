@@ -57,16 +57,38 @@ Nothing else matters until money works end to end.
 - **Cart** — the prototype lets you accumulate courses, seats, and marketplace
   items and check out once. Currently every purchase is a separate transaction.
 - **Orders history** for the member, and Admin → Orders for the owner.
-- **Go live on PayPal**: live credentials, live plans, live webhook.
+- **Refunds.** Issued in PayPal; the `PAYMENT.CAPTURE.REFUNDED` webhook marks
+  the order refunded and withdraws the courses and seats it granted. A partial
+  refund is recorded and flagged but withdraws nothing — which line it covers is
+  not knowable from the event, so that stays a human decision.
+- **App bar** — cart, notifications and the account menu in the top bar, as in
+  the prototype. This also gave phones a navigation drawer; the sidebar used to
+  be `display: none` below 900px, leaving no nav at all.
+- **Go live on PayPal**: live credentials, live plans, live webhook. ← the only
+  thing left in this phase.
 
-Blocked on: a sandbox buyer account. Nothing else.
+Everything above is done and exercised in sandbox against real webhook
+deliveries.
+
+### Known gaps left in phase 1
+
+- **Notifications are derived, not stored.** There is no Notification table;
+  the bell reads bookings, orders and entitlements directly, and read/unread is
+  one timestamp per member (`User.notificationsReadAt`). That is deliberate —
+  see the note at the top of `src/lib/notifications.ts`. It means no per-item
+  read state and no notification that outlives the record behind it.
+- **No search in the app bar.** The prototype has one. There is nothing to
+  search yet — no community, no marketplace — and a search box that returns
+  nothing is worse than no search box.
 
 ## Phase 2 — Admin
 
 Tom cannot run the school from the app yet; he can only edit class dates.
 
 - **Members** — list, search, view a member, adjust tier by hand, grant a course.
-- **Orders** — what was bought, refunds, what a payment granted.
+- **Orders** — what was bought and what a payment granted. Refunds already
+  land here from PayPal; what is missing is issuing one from this screen, and
+  resolving a flagged partial refund by hand.
 - **Attendance** — roll call per class, which drives certification credit.
 - **Course builder** — modules and lessons without a database client. This is
   what makes the catalog editable by the client rather than by a developer.

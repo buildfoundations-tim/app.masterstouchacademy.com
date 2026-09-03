@@ -39,7 +39,9 @@ export default async function AdminOrdersPage({
         <div className="stat-row">
           <div className="card stat-tile">
             <span className="stat-tile__value">{money(totals.grossCents)}</span>
-            <span className="stat-tile__label">Taken</span>
+            <span className="stat-tile__label">
+              {totals.refundedCents > 0 ? `Kept, after ${money(totals.refundedCents)} refunded` : 'Taken'}
+            </span>
           </div>
           <div className="card stat-tile">
             <span className="stat-tile__value">{totals.completed}</span>
@@ -54,6 +56,10 @@ export default async function AdminOrdersPage({
               {totals.failed}
             </span>
             <span className="stat-tile__label">Failed</span>
+          </div>
+          <div className="card stat-tile">
+            <span className="stat-tile__value">{totals.refunded}</span>
+            <span className="stat-tile__label">Refunded</span>
           </div>
         </div>
 
@@ -88,10 +94,13 @@ export default async function AdminOrdersPage({
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span
-                      className={`badge${o.status === 'completed' ? ' badge--done' : o.status === 'failed' ? ' badge--bad' : ' badge--locked'}`}
+                      className={`badge${o.status === 'completed' ? ' badge--done' : o.status === 'failed' || o.status === 'refunded' ? ' badge--bad' : ' badge--locked'}`}
                     >
                       {STATUS_LABEL[o.status] ?? o.status}
                     </span>
+                    {o.partiallyRefunded ? (
+                      <span className="badge badge--bad">Part refunded</span>
+                    ) : null}
                     <strong style={{ fontSize: 14 }}>{o.buyer?.name}</strong>
                     <span className="faint" style={{ fontSize: 12.5 }}>
                       {o.buyer?.email}
@@ -103,7 +112,20 @@ export default async function AdminOrdersPage({
                   </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 19, fontWeight: 700 }}>{money(o.totalCents)}</div>
+                  <div
+                    style={{
+                      fontSize: 19,
+                      fontWeight: 700,
+                      textDecoration: o.status === 'refunded' ? 'line-through' : undefined,
+                    }}
+                  >
+                    {money(o.totalCents)}
+                  </div>
+                  {o.refundedCents ? (
+                    <div className="faint" style={{ fontSize: 11.5 }}>
+                      {money(o.refundedCents)} refunded {formatDate(o.refundedAt!)}
+                    </div>
+                  ) : null}
                   {o.savedCents > 0 ? (
                     <div className="faint" style={{ fontSize: 11.5 }}>
                       after {money(o.savedCents)} discount
@@ -134,6 +156,14 @@ export default async function AdminOrdersPage({
                 </p>
               ) : null}
 
+              {o.partiallyRefunded ? (
+                <p className="order-card__note order-card__note--bad">
+                  Part of this order was refunded. Access was <strong>not</strong> withdrawn — a
+                  partial refund does not say which line it covers, so that call is yours. Remove
+                  the entitlement by hand if it should go.
+                </p>
+              ) : null}
+
               {o.status === 'completed' && !o.fulfilledAt ? (
                 <p className="order-card__note order-card__note--bad">
                   Captured but not fulfilled — this member paid and did not receive access.
@@ -145,10 +175,10 @@ export default async function AdminOrdersPage({
         )}
 
         <p className="faint" style={{ fontSize: 12, marginTop: 18, lineHeight: 1.6 }}>
-          Refunds are issued in PayPal, not here. Refunding there sends a
-          PAYMENT.CAPTURE.REFUNDED webhook, which this app does not yet act on — so a refunded
-          order will still show as paid and access is not withdrawn automatically. That is the next
-          thing to build on this screen.
+          Refunds are issued in PayPal, not here — this screen reads them back. Refunding there
+          sends a webhook; a <strong>full</strong> refund marks the order refunded and withdraws the
+          courses and class seats it granted. A <strong>partial</strong> refund is recorded and
+          flagged, but access is left alone for you to decide.
         </p>
       </div>
     </>

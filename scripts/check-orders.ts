@@ -14,6 +14,7 @@ import 'dotenv/config';
 import { discountedCents } from '../src/lib/access';
 // The REAL pricing function the checkout action calls — not a copy.
 import { pricePurchase } from '../src/lib/pricing';
+import { refundOrder } from '../src/lib/refunds';
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -188,6 +189,101 @@ async function main() {
   });
   const days = Math.round((ent.expiresAt!.getTime() - Date.now()) / 86400000);
   check('expires in ~365 days', days >= 364 && days <= 366, true);
+
+  console.log('\nRefunds:');
+
+  // Build a paid order by hand with a known capture id, plus the grants it
+  // would have made, then let the webhook path reverse it.
+  const CAP = 'TEST-CAPTURE-REFUND';
+  await db.order.deleteMany({ where: { paypalCaptureId: CAP } });
+  const seatClass = await db.scheduledClass.findFirstOrThrow({ where: { published: true } });
+
+  const refundable = await db.order.create({
+    data: {
+      userId: community.id,
+      paypalOrderId: 'TEST-ORDER-REFUND',
+      paypalCaptureId: CAP,
+      status: 'completed',
+      totalCents: 50000,
+      capturedAt: new Date(),
+      fulfilledAt: new Date(),
+      items: {
+        create: [
+          { kind: 'course', courseId: wrt.id, description: wrt.title, listCents: 45000, unitCents: 45000 },
+          { kind: 'class_seat', classId: seatClass.id, description: 'Seat', listCents: 5000, unitCents: 5000 },
+        ],
+      },
+    },
+  });
+  // An earlier assertion in this file left a WRT entitlement on this member.
+  await db.entitlement.deleteMany({ where: { userId: community.id, courseId: wrt.id } });
+  await db.seatBooking.deleteMany({ where: { userId: community.id, classId: seatClass.id } });
+  await db.entitlement.create({
+    data: { userId: community.id, courseId: wrt.id, source: 'purchase' },
+  });
+  await db.seatBooking.create({
+    data: { userId: community.id, classId: seatClass.id, mode: 'inperson', paidCents: 5000 },
+  });
+
+  console.log('\n  A partial refund records but does not withdraw:');
+  const partial = await refundOrder({ captureId: CAP, refundedCents: 10000 });
+  check('handled', partial.ok && partial.partial, true);
+  check('nothing revoked', partial.ok && partial.revoked, false);
+  let row = await db.order.findUniqueOrThrow({ where: { id: refundable.id } });
+  check('still marked paid', row.status, 'completed');
+  check('amount recorded', row.refundedCents, 10000);
+  check('flagged for a human', row.error !== null, true);
+  check(
+    'the course entitlement survives',
+    await db.entitlement.count({ where: { userId: community.id, courseId: wrt.id } }),
+    1
+  );
+  check(
+    'the seat survives',
+    await db.seatBooking.count({ where: { userId: community.id, classId: seatClass.id } }),
+    1
+  );
+
+  console.log('\n  Refunding the rest withdraws everything:');
+  const full = await refundOrder({ captureId: CAP, refundedCents: 40000 });
+  check('revoked', full.ok && full.revoked, true);
+  row = await db.order.findUniqueOrThrow({ where: { id: refundable.id } });
+  check('marked refunded', row.status, 'refunded');
+  check('refunds accumulate to the total', row.refundedCents, 50000);
+  check('the partial-refund flag is cleared', row.error, null);
+  check(
+    'the purchase entitlement is gone',
+    await db.entitlement.count({ where: { userId: community.id, courseId: wrt.id, source: 'purchase' } }),
+    0
+  );
+  check(
+    'the seat is released',
+    await db.seatBooking.count({ where: { userId: community.id, classId: seatClass.id } }),
+    0
+  );
+
+  console.log('\n  A redelivered refund does not revoke twice:');
+  // Re-grant by another route — a membership, say. A repeat webhook must not
+  // take away something the member holds for a different reason.
+  await db.entitlement.create({
+    data: { userId: community.id, courseId: wrt.id, source: 'purchase' },
+  });
+  const again = await refundOrder({ captureId: CAP, refundedCents: 50000 });
+  check('accepted', again.ok, true);
+  check('but revokes nothing', again.ok && again.revoked, false);
+  check(
+    'the re-granted entitlement is untouched',
+    await db.entitlement.count({ where: { userId: community.id, courseId: wrt.id } }),
+    1
+  );
+
+  console.log('\n  A refund against an unknown capture is reported, not thrown:');
+  const unknown = await refundOrder({ captureId: 'NOPE', refundedCents: 100 });
+  check('rejected', unknown.ok, false);
+  check('with a reason', !unknown.ok && unknown.reason, 'unknown-capture');
+
+  await db.orderItem.deleteMany({ where: { orderId: refundable.id } });
+  await db.order.delete({ where: { id: refundable.id } });
 
   // Reset.
   await db.orderItem.deleteMany({ where: { orderId: order.id } });

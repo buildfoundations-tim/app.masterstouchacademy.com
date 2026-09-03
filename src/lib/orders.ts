@@ -182,3 +182,7 @@ export async function settleOrder(paypalOrderId: string): Promise<SettleResult> 
 
   return { ok: true, alreadyDone: false, order: { id: order.id } };
 }
+
+// Reversing an order lives in @/lib/refunds (no server-only) so the test suite
+// exercises the real function. Re-exported so callers have one import site.
+export { refundOrder, type RefundResult } from '@/lib/refunds';

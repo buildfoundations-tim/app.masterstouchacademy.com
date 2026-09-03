@@ -6,8 +6,8 @@ import type { ReactNode } from 'react';
 
 /**
  * Left navigation. Client-side only so the active item can be derived from the
- * pathname; the account block is passed in from the server layout so no user
- * data has to cross into a client component.
+ * pathname. Identity and sign-out live in the app bar's account menu, not
+ * here — one home for the account, as the prototype has it.
  */
 
 type Item = { href: string; label: string; icon: ReactNode };
@@ -88,13 +88,9 @@ const ACCOUNT: Item[] = [
 export function Sidebar({
   isOwner,
   isInstructor,
-  cartCount = 0,
-  children,
 }: {
   isOwner: boolean;
   isInstructor: boolean;
-  cartCount?: number;
-  children: ReactNode;
 }) {
   const pathname = usePathname();
 
@@ -122,20 +118,11 @@ export function Sidebar({
       <nav className="sidebar__nav" aria-label="Main">
         {MAIN.map(renderLink)}
 
+        {/* The cart moved to the app bar, where it sits beside notifications
+            and the account menu — as in the prototype. It is not duplicated
+            here: two live counts for one cart is one too many places to be
+            wrong. */}
         <div className="sidebar__group">Account</div>
-        <Link
-          href="/cart"
-          className="navlink"
-          aria-current={isActive('/cart') ? 'page' : undefined}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="9" cy="20" r="1.4" />
-            <circle cx="18" cy="20" r="1.4" />
-            <path d="M2 3h3l2.4 12.2a1.6 1.6 0 001.6 1.3h8.4a1.6 1.6 0 001.6-1.3L21 7H6" />
-          </svg>
-          <span>Cart</span>
-          {cartCount > 0 ? <span className="navlink__badge">{cartCount}</span> : null}
-        </Link>
         {ACCOUNT.map(renderLink)}
 
         {/* The instructor portal is not built yet. The link lived here before
@@ -168,8 +155,6 @@ export function Sidebar({
           </>
         ) : null}
       </nav>
-
-      {children}
     </aside>
   );
 }

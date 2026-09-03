@@ -90,6 +90,8 @@ export type SessionUser = {
   isInstructor: boolean;
   onboardedAt: Date | null;
   emailVerifiedAt: Date | null;
+  notificationsReadAt: Date | null;
+  createdAt: Date;
 };
 
 /**
@@ -118,6 +120,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
           isInstructor: true,
           onboardedAt: true,
           emailVerifiedAt: true,
+          notificationsReadAt: true,
+          createdAt: true,
         },
       },
     },

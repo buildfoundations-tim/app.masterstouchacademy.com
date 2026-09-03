@@ -28,6 +28,10 @@ export type OrderRecord = {
   placedAt: Date;
   capturedAt: Date | null;
   fulfilledAt: Date | null;
+  refundedAt: Date | null;
+  refundedCents: number | null;
+  /** A refund smaller than the total. Access was deliberately left alone. */
+  partiallyRefunded: boolean;
   error: string | null;
   lines: OrderLine[];
   /** Present on the admin view only. */
@@ -43,6 +47,8 @@ function toRecord(o: {
   createdAt: Date;
   capturedAt: Date | null;
   fulfilledAt: Date | null;
+  refundedAt: Date | null;
+  refundedCents: number | null;
   error: string | null;
   items: Array<{
     description: string;
@@ -63,6 +69,10 @@ function toRecord(o: {
     placedAt: o.createdAt,
     capturedAt: o.capturedAt,
     fulfilledAt: o.fulfilledAt,
+    refundedAt: o.refundedAt,
+    refundedCents: o.refundedCents,
+    partiallyRefunded:
+      o.refundedCents !== null && o.refundedCents > 0 && o.refundedCents < o.totalCents,
     error: o.error,
     lines: o.items.map((i) => ({
       description: i.description,
@@ -151,19 +161,39 @@ export async function allOrders(opts: { search?: string; limit?: number } = {}):
   return rows.map(toRecord);
 }
 
-/** Headline numbers for Admin → Orders. Completed orders only — money taken. */
+/**
+ * Headline numbers for Admin → Orders.
+ *
+ * `grossCents` is money taken and kept — refunds are subtracted, including the
+ * partial ones, because the owner reads this tile as "what is in the account".
+ * A number that ignored refunds would be wrong in the direction that matters.
+ */
 export async function orderTotals() {
-  const [completed, failed, pending, sum] = await Promise.all([
+  const [completed, failed, pending, refunded, sum, refundSum] = await Promise.all([
     db.order.count({ where: { status: 'completed' } }),
     db.order.count({ where: { status: 'failed' } }),
     db.order.count({ where: { status: 'created' } }),
-    db.order.aggregate({ where: { status: 'completed' }, _sum: { totalCents: true } }),
+    db.order.count({ where: { refundedAt: { not: null } } }),
+    db.order.aggregate({
+      where: { status: { in: ['completed', 'refunded'] } },
+      _sum: { totalCents: true },
+    }),
+    db.order.aggregate({
+      where: { refundedAt: { not: null } },
+      _sum: { refundedCents: true },
+    }),
   ]);
+
+  const takenCents = sum._sum.totalCents ?? 0;
+  const refundedCents = refundSum._sum.refundedCents ?? 0;
 
   return {
     completed,
     failed,
     pending,
-    grossCents: sum._sum.totalCents ?? 0,
+    refunded,
+    takenCents,
+    refundedCents,
+    grossCents: takenCents - refundedCents,
   };
 }

@@ -145,9 +145,117 @@ input, select, textarea { font: inherit; }
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 26px;
+  /* Right padding reserves the band the app bar sits in — the two share one
+     64px row rather than stacking. Keep them in step. */
+  padding: 12px 168px 12px 26px;
 }
-.topbar__title { font-family: var(--ff-display); font-size: 22px; }
+.topbar > * { min-width: 0; }
+.topbar__title {
+  font-family: var(--ff-display); font-size: 22px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── App bar: cart, notifications, account ───────────────── */
+/* Fixed rather than in flow because the title lives in each page's .topbar and
+   the actions live in the shell. One visual bar, two owners. */
+.appbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 64px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 22px;
+}
+.appbar__slot { position: relative; }
+
+.appbar__btn, .appbar__account {
+  position: relative;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--surface-tint);
+  color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.appbar__account { background: none; }
+.appbar__btn:hover { background: var(--border); }
+.appbar__btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+.appbar__badge {
+  position: absolute;
+  top: -3px; right: -3px;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--gold);
+  color: var(--dark);
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.appbar__badge--alert { background: var(--danger); color: #fff; }
+
+.popover {
+  position: absolute;
+  top: 46px; right: 0;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(440px, calc(100vh - 96px));
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 30px rgba(0,0,0,.14);
+  padding: 8px;
+  z-index: 50;
+}
+.popover--menu { width: 220px; padding: 6px; }
+.popover__head {
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--fainter);
+  padding: 6px 12px 8px;
+}
+.popover__empty { padding: 20px 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; text-align: center; }
+.popover__who {
+  padding: 10px 12px; border-bottom: 1px solid var(--surface-tint); margin-bottom: 4px;
+  display: grid; gap: 2px; font-size: 13px;
+}
+.popover__who .faint { font-size: 11.5px; }
+.popover__item {
+  display: block; width: 100%; text-align: left;
+  padding: 9px 12px; border: 0; background: none;
+  border-radius: var(--r-sm);
+  font: inherit; font-size: 13px; color: var(--ink);
+  cursor: pointer; text-decoration: none;
+}
+.popover__item:hover { background: var(--surface-warm); }
+.popover__item--danger { color: var(--danger); }
+
+.notice {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 10px 12px; border-radius: var(--r-sm);
+  text-decoration: none; color: inherit;
+}
+.notice:hover { background: var(--surface-warm); }
+.notice__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 6px;
+  /* Read items keep the slot so titles stay aligned; only the fill goes. */
+  background: transparent;
+}
+.notice__dot[data-unread] { background: var(--gold); }
+.notice__dot--warn[data-unread] { background: var(--danger); }
+.notice__text { min-width: 0; display: grid; gap: 2px; }
+.notice__title { font-size: 13px; line-height: 1.4; }
+.notice__body { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.notice__time { font-size: 11.5px; color: var(--fainter); }
+
+/* Menu button — phones only; the sidebar is always visible above 900px. */
+.navtoggle { display: none; }
+.navscrim { display: none; }
 
 .page { padding: 26px; max-width: 1180px; width: 100%; }
 
@@ -277,8 +385,46 @@ input, select, textarea { font: inherit; }
   .auth__brand { padding: 36px 24px; }
   .auth__brand h1 { font-size: 32px; }
   .page { padding: 18px 16px 48px; }
-  .topbar { padding: 12px 16px; }
-  .sidebar { display: none; }
+  .topbar { padding: 12px 158px 12px 60px; }
+  .appbar { padding: 0 12px; gap: 6px; }
+
+  /* Bare spans in a title bar are stats ("$360 across 2 paid"). There is no
+     room for them beside the actions on a phone, and they are repeated in the
+     page below. Links stay — some pages put a back link here. */
+  .topbar > span { display: none; }
+
+  /* The sidebar becomes a drawer rather than disappearing. It used to be
+     display:none here, which left a phone with no navigation at all. */
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 160;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 0 0 40px rgba(0,0,0,.3);
+  }
+  body[data-nav-open] .sidebar { transform: none; }
+
+  .navtoggle {
+    display: flex;
+    position: fixed;
+    top: 14px; left: 12px;
+    z-index: 170;
+    width: 36px; height: 36px;
+    align-items: center; justify-content: center;
+    border: 0; border-radius: 9px;
+    background: var(--surface-tint);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .navtoggle svg { fill: none; stroke: currentColor; stroke-width: 2; }
+
+  .navscrim {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 150;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -406,7 +552,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .certificate__id { font-size: 11.5px; color: var(--fainter); margin-bottom: 22px; }
 
 @media print {
-  .sidebar, .topbar, .no-print { display: none !important; }
+  .sidebar, .topbar, .appbar, .navtoggle, .navscrim, .no-print { display: none !important; }
   .page { padding: 0; max-width: none; }
   .certificate { border: 0; background: #fff; }
 }

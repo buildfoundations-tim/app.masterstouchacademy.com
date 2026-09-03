@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { readWebhookHeaders, verifyWebhook } from '@/lib/paypal';
 import { syncSubscription } from '@/lib/subscriptions';
-import { settleOrder } from '@/lib/orders';
+import { settleOrder, refundOrder } from '@/lib/orders';
 
 /**
  * PayPal webhook receiver.
@@ -33,6 +33,9 @@ const HANDLED = new Set([
   'PAYMENT.SALE.COMPLETED',
   'PAYMENT.CAPTURE.COMPLETED',
   'CHECKOUT.ORDER.APPROVED',
+  // Refunds are issued in PayPal, never here. These are how we hear about it.
+  'PAYMENT.CAPTURE.REFUNDED',
+  'PAYMENT.CAPTURE.REVERSED',
 ]);
 
 export async function POST(request: Request) {
@@ -51,7 +54,8 @@ export async function POST(request: Request) {
       id?: string;
       billing_agreement_id?: string;
       custom_id?: string;
-      supplementary_data?: { related_ids?: { order_id?: string } };
+      amount?: { value?: string; currency_code?: string };
+      supplementary_data?: { related_ids?: { order_id?: string; capture_id?: string } };
     };
   };
   try {
@@ -94,6 +98,40 @@ export async function POST(request: Request) {
   }
 
   try {
+    // A refund. The resource here is the REFUND, not the capture — the capture
+    // it reverses is on supplementary_data. The amount is the refunded amount,
+    // which may be less than the order: refundOrder decides what that means.
+    if (eventType === 'PAYMENT.CAPTURE.REFUNDED' || eventType === 'PAYMENT.CAPTURE.REVERSED') {
+      const captureId = event.resource?.supplementary_data?.related_ids?.capture_id;
+      const value = event.resource?.amount?.value;
+
+      if (!captureId || value === undefined) {
+        await db.webhookEvent.update({
+          where: { transmissionId: headers.transmissionId },
+          data: { processedAt: new Date(), error: 'refund event without a capture id or amount' },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      const refunded = await refundOrder({
+        captureId,
+        refundedCents: Math.round(Number(value) * 100),
+      });
+
+      await db.webhookEvent.update({
+        where: { transmissionId: headers.transmissionId },
+        data: {
+          processedAt: new Date(),
+          error: refunded.ok
+            ? refunded.partial
+              ? 'partial refund: access left in place for a human to decide'
+              : null
+            : refunded.reason,
+        },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
     // One-time purchases settle through the Orders path. This is the safety
     // net: if the buyer closes the tab before /checkout/return loads, the
     // webhook still captures and grants. settleOrder is idempotent, so the two

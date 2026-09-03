@@ -114,7 +114,7 @@ export default async function OrdersPage() {
                   <div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span
-                        className={`badge${o.status === 'completed' ? ' badge--done' : ' badge--locked'}`}
+                        className={`badge${o.status === 'completed' ? ' badge--done' : o.status === 'refunded' ? ' badge--bad' : ' badge--locked'}`}
                       >
                         {STATUS_LABEL[o.status] ?? o.status}
                       </span>
@@ -128,7 +128,20 @@ export default async function OrdersPage() {
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 19, fontWeight: 700 }}>{money(o.totalCents)}</div>
+                    <div
+                      style={{
+                        fontSize: 19,
+                        fontWeight: 700,
+                        textDecoration: o.status === 'refunded' ? 'line-through' : undefined,
+                      }}
+                    >
+                      {money(o.totalCents)}
+                    </div>
+                    {o.refundedCents ? (
+                      <div className="faint" style={{ fontSize: 11.5 }}>
+                        {money(o.refundedCents)} refunded
+                      </div>
+                    ) : null}
                     {o.savedCents > 0 ? (
                       <div className="faint" style={{ fontSize: 11.5 }}>
                         saved {money(o.savedCents)}
@@ -141,7 +154,7 @@ export default async function OrdersPage() {
                   {o.lines.map((l, i) => (
                     <li key={i}>
                       <span>
-                        {l.courseSlug && o.status === 'completed' ? (
+                        {l.courseSlug && (o.status === 'completed' || o.partiallyRefunded) ? (
                           <Link href={`/classroom/${l.courseSlug}`}>{l.description}</Link>
                         ) : (
                           l.description
@@ -161,6 +174,20 @@ export default async function OrdersPage() {
                   <p className="order-card__note">
                     This order was started but never paid, so nothing was charged and nothing was
                     granted. You can buy the items again from the catalogue.
+                  </p>
+                ) : null}
+                {o.status === 'refunded' ? (
+                  <p className="order-card__note">
+                    This order was refunded on {formatDate(o.refundedAt!)}. The money has gone back
+                    to your PayPal account, and the courses and seats it paid for have been removed.
+                    Refunds usually appear within a few business days.
+                  </p>
+                ) : null}
+                {o.partiallyRefunded ? (
+                  <p className="order-card__note">
+                    Part of this order — {money(o.refundedCents!)} — was refunded on{' '}
+                    {formatDate(o.refundedAt!)}. Your access is unchanged. Get in touch if that is
+                    not what you expected.
                   </p>
                 ) : null}
                 {o.status === 'failed' ? (
