@@ -62,10 +62,38 @@ export async function GET() {
     ].filter((k) => Boolean(process.env[k])).length,
   };
 
+  const transport = process.env.MAIL_TRANSPORT || 'console';
+
+  // "willActuallySend" was not enough: a transport of smtp with no password
+  // still fails, just later and less visibly — at authentication, after the
+  // member has already submitted the form. Report whether the transport is
+  // fully configured, not merely selected.
+  const smtpComplete = Boolean(
+    process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD
+  );
+
   const mail = {
-    transport: process.env.MAIL_TRANSPORT || 'console',
-    // console logs instead of sending, so nobody would receive anything.
-    willActuallySend: (process.env.MAIL_TRANSPORT || 'console') !== 'console',
+    transport,
+    willActuallySend: transport !== 'console',
+    configured:
+      transport === 'smtp'
+        ? smtpComplete
+        : transport === 'resend'
+          ? Boolean(process.env.RESEND_API_KEY)
+          : true,
+    smtp:
+      transport === 'smtp'
+        ? {
+            hostSet: Boolean(process.env.SMTP_HOST),
+            portSet: Boolean(process.env.SMTP_PORT),
+            userSet: Boolean(process.env.SMTP_USER),
+            passwordSet: Boolean(process.env.SMTP_PASSWORD),
+            // 587 wants STARTTLS (secure=false); 465 wants implicit TLS.
+            port: process.env.SMTP_PORT ?? '587 (default)',
+            secure: process.env.SMTP_SECURE === 'true',
+          }
+        : undefined,
+    fromSet: Boolean(process.env.MAIL_FROM),
   };
 
   const app = {
@@ -93,7 +121,8 @@ export async function GET() {
       'POSTGRES_URL_NON_POOLING', 'POSTGRES_URL_NO_SSL', 'PGHOST', 'PGDATABASE',
       'NEON_DATABASE_URL', 'AUTH_SECRET', 'APP_URL', 'PAYPAL_ENV', 'PAYPAL_CLIENT_ID',
       'PAYPAL_CLIENT_SECRET', 'PAYPAL_WEBHOOK_ID', 'MAIL_TRANSPORT', 'MAIL_FROM',
-      'SMTP_HOST', 'RESEND_API_KEY',
+      'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_SECURE',
+      'RESEND_API_KEY',
     ].filter((k) => Boolean(process.env[k])),
     // Any custom (non-system) names, so a typo or unexpected prefix shows up.
     customLike: Object.keys(process.env)
@@ -101,7 +130,9 @@ export async function GET() {
       .sort(),
   };
 
-  const ready = database.status === 'ok' && app.authSecretSet;
+  // ready means a member could actually complete signup: the database answers,
+  // sessions can be signed, and a verification email would genuinely be sent.
+  const ready = database.status === 'ok' && app.authSecretSet && mail.configured;
 
   return NextResponse.json(
     { ready, database, paypal, mail, app, platform },
