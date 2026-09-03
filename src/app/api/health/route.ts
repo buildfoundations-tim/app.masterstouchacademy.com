@@ -84,6 +84,21 @@ export async function GET() {
     // A count, never the names or values — enough to distinguish "no
     // environment at all" from "our variables specifically are missing".
     totalEnvVars: Object.keys(process.env).length,
+    // Which recognised names are actually present. An allowlist of NAMES only —
+    // no value is ever read. Integrations often inject their own naming
+    // (Neon/Vercel Postgres use POSTGRES_*), which looks identical to "nothing
+    // is set" unless you go looking for it.
+    present: [
+      'DATABASE_URL', 'DATABASE_URL_UNPOOLED', 'POSTGRES_URL', 'POSTGRES_PRISMA_URL',
+      'POSTGRES_URL_NON_POOLING', 'POSTGRES_URL_NO_SSL', 'PGHOST', 'PGDATABASE',
+      'NEON_DATABASE_URL', 'AUTH_SECRET', 'APP_URL', 'PAYPAL_ENV', 'PAYPAL_CLIENT_ID',
+      'PAYPAL_CLIENT_SECRET', 'PAYPAL_WEBHOOK_ID', 'MAIL_TRANSPORT', 'MAIL_FROM',
+      'SMTP_HOST', 'RESEND_API_KEY',
+    ].filter((k) => Boolean(process.env[k])),
+    // Any custom (non-system) names, so a typo or unexpected prefix shows up.
+    customLike: Object.keys(process.env)
+      .filter((k) => /^(DATABASE|POSTGRES|PG|NEON|PAYPAL|MAIL|SMTP|APP|AUTH|RESEND)/.test(k))
+      .sort(),
   };
 
   const ready = database.status === 'ok' && app.authSecretSet;
