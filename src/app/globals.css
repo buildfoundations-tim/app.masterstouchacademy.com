@@ -743,4 +743,62 @@ textarea.input { line-height: 1.6; resize: vertical; }
 .stat-tile__label { font-size: 11.5px; color: var(--faint); }
 
 .admin-search { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.admin-search .input { flex: 1 1 220px; width: auto; }
+
+/* Small print under a field — why a value matters, not what it is. */
+.hint { display: block; font-size: 11.5px; color: var(--fainter); margin-top: 5px; line-height: 1.5; }
+
+.admin-panel { padding: 20px 22px; margin-bottom: 16px; }
+.admin-panel__title {
+  font-family: var(--ff-display); font-size: 19px; font-weight: 400;
+  margin-bottom: 10px;
+}
+.admin-form { max-width: 460px; }
+.admin-form--row { display: flex; gap: 8px; align-items: flex-start; max-width: 620px; }
+.admin-form--row .input { flex: 1; }
+.admin-form--row .btn { flex-shrink: 0; }
+
+.linkbtn--danger { color: var(--danger); }
+
+.member-head {
+  display: flex; justify-content: space-between; gap: 20px; align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+/* ── Member table ────────────────────────────────────────── */
+/* A grid rather than a <table>: the rows are links, and a whole-row link is
+   what an owner reaches for. Scrolls sideways below the min-width instead of
+   crushing the columns. */
+.table-wrap { overflow-x: auto; padding: 0; }
+
+.mtable { min-width: 860px; }
+.mtable__head, .mtable__row {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(150px, 1.6fr) 130px 110px 84px 96px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 20px;
+}
+.mtable__head {
+  background: var(--bg);
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--fainter);
+}
+.mtable__row {
+  border-top: 1px solid var(--surface-tint);
+  font-size: 13px; color: inherit; text-decoration: none;
+}
+.mtable__row:hover { background: var(--bg); }
+.mtable__who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mtable__name {
+  display: grid; min-width: 0;
+  font-weight: 500; line-height: 1.35;
+}
+.mtable__email, .mtable__trunc {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mtable__email { font-size: 11.5px; font-weight: 400; }
+.mtable__flag { display: block; font-size: 10.5px; margin-top: 3px; }
+
+.avatar--light { background: var(--surface-tint); color: var(--muted); width: 28px; height: 28px; font-size: 11px; }
 .admin-search .input { flex: 1; min-width: 220px; }

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/auth';
-import { TIER_LABEL } from '@/lib/access';
+import { roleLabel } from '@/lib/access';
 import { Sidebar } from '@/components/sidebar';
 import { cartCount } from '@/lib/cart';
 import { noticesFor } from '@/lib/notifications';
@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
 
   return (
     <div className="shell">
-      <Sidebar isOwner={user.isOwner} isInstructor={user.isInstructor} />
+      <Sidebar role={user.role} />
 
       <AppBar
         cartCount={itemsInCart}
@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
         unreadCount={notices.filter((n) => n.unread).length}
         name={user.displayName || `${user.firstName} ${user.lastName}`}
         initials={initials}
-        tierLabel={TIER_LABEL[user.tier]}
+        tierLabel={roleLabel(user.role, user.tier)}
         markRead={markNotificationsRead}
         signOut={signOut}
       />

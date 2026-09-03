@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { classDiscount, discountedCents, TIER_LABEL } from '@/lib/access';
+import { classDiscount, discountedCents, TIER_LABEL, isStaff } from '@/lib/access';
 import { money, dateParts, seatsLabel } from '@/lib/format';
 import { paypalConfigured } from '@/lib/paypal';
 import { addToCart } from '@/app/(app)/cart/actions';
@@ -57,7 +57,7 @@ export default async function SchedulePage() {
             <strong>{Math.round(discount * 100)}% off</strong> every seat below. Discounted prices
             are shown.
           </p>
-        ) : (
+        ) : isStaff(user.role) ? null : (
           <p className="alert alert--info">
             You&rsquo;re on {TIER_LABEL[user.tier]}. Pro takes 10% off every seat, Pro+ and Crew
             Leader take 20%.{' '}

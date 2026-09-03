@@ -72,7 +72,7 @@ async function main() {
     },
   });
   check('new members start on Community (tier 1)', user.tier, 1);
-  check('new members are not owners', user.isOwner, false);
+  check('new members are not owners', user.role === 'owner', false);
   check('email starts unverified', user.emailVerifiedAt, null);
   check('settings row created alongside', await db.userSettings.count({ where: { userId: user.id } }), 1);
 

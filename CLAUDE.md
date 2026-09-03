@@ -49,7 +49,7 @@ assigned at start and changes between restarts**, so re-check it if the app sudd
 
 Seed users (password `academy-dev-2026`), one per tier so the access rules are visible immediately:
 
-- `tom@masterstouchacademy.com` — owner + instructor, tier 4
+- `tom@masterstouchacademy.com` — role `owner`, **no membership tier**
 - `pro@example.com` — tier 2, sees the CEC library open
 - `community@example.com` — tier 1, sees everything locked
 
@@ -82,9 +82,15 @@ stable **7.10.0** deliberately; do not let an install float it to the RC.
 
 - **Tier is an ordinal `Int` 1–4**, never an enum: 1 Community, 2 Pro, 3 Pro+, 4 Crew Leader.
   Comparisons are `>=`.
-- **Access = purchased, OR (tier >= 2 AND group === 'cec')**. IICRC certification courses are a la
-  carte at *every* tier — including tier 4. An owner at tier 4 seeing an IICRC course unlocked
-  without an entitlement is a bug, not a convenience.
+- **Role is not tier.** `User.role` (`member | instructor | owner`) says what someone *is*;
+  `tier` says what a member *pays for*. Staff carry **no tier** — they sit at 1 and are labelled
+  by role everywhere, via `roleLabel()`. Running the school used to be expressed as `isOwner`
+  plus a tier of 4, which made the owner read as a Crew Leader subscriber in every list and
+  upsell banner. Do not put staff back on a tier.
+- **Access = purchased, OR (tier >= 2 AND group === 'cec'), OR (staff AND group === 'cec')**.
+  IICRC certification courses are a la carte for *everyone*, staff included — an owner seeing an
+  IICRC course unlocked without an entitlement is a bug, not a convenience. Staff get the CEC
+  library because they publish it, which is exactly what the old tier-4 owner had.
 - Discounts: Pro 10%, Pro+ and Crew Leader 20%, on class seats and marketplace items.
 
 All enforced server-side. A tier or entitlement arriving from the client is never trusted.
@@ -122,15 +128,18 @@ verification, password reset), the classroom, lesson player and progress, the fi
 certificates, the class schedule, owner class admin, and PayPal for both subscriptions and
 one-time purchases.
 
-**Not built**: most of the 13-section Admin (only Classes exists), community, marketplace,
+**Not built**: most of the 13-section Admin (Classes, Orders and Members exist), community, marketplace,
 consulting, messaging, the AI assistant, crew management, and the instructor portal. The sidebar
-links `/admin/members` and `/instructor`, neither of which exists yet — they 404.
+links only pages that exist; `/instructor` is deliberately absent until it is built.
 
 **Commerce is wired but unconfigured.** PayPal subscriptions and one-time purchases are built and
 tested; nothing can actually be bought until the credentials in `docs/paypal-setup.md` are set.
 Every purchase surface degrades to a disabled button with an explicit warning rather than a
-half-working checkout. `User.tier` is only ever written by `syncSubscription()`, which re-reads
-state from PayPal — nothing else in the codebase sets it.
+half-working checkout. `User.tier` is only ever written by `recalcUserTier()` in `src/lib/tier.ts` —
+nothing else in the codebase sets it. It derives the tier from subscriptions, except for staff
+(who have none) and for a **hand-set tier**: `User.tierOverride`, which the owner sets from
+Admin → Members. Without that column an override would be silently undone by the next
+subscription webhook.
 
 ## Email and the account lifecycle
 

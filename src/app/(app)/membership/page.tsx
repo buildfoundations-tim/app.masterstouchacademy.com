@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/auth';
-import { TIER_LABEL, TIER } from '@/lib/access';
+import { TIER_LABEL, TIER, isStaff, roleLabel } from '@/lib/access';
 import { PLANS, paypalPlanId, planIdEnvName, type Interval } from '@/lib/billing';
 import { paypalConfigured, paypalEnv } from '@/lib/paypal';
 import { activeSubscription } from '@/lib/subscriptions';
@@ -54,7 +54,9 @@ export default async function MembershipPage({
       <header className="topbar">
         <h1 className="topbar__title">Membership</h1>
         <span className="muted" style={{ fontSize: 13 }}>
-          You&rsquo;re on {TIER_LABEL[user.tier]}
+          {isStaff(user.role)
+            ? `${roleLabel(user.role, user.tier)} — staff, no membership`
+            : `You’re on ${TIER_LABEL[user.tier]}`}
         </span>
       </header>
 

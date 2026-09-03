@@ -3,6 +3,7 @@ import 'server-only';
 import { notFound } from 'next/navigation';
 
 import { db } from '@/lib/db';
+import type { UserRole } from '@/generated/prisma/enums';
 import { canAccessCourse, lockReason, type LockReason } from '@/lib/access';
 
 /**
@@ -10,7 +11,7 @@ import { canAccessCourse, lockReason, type LockReason } from '@/lib/access';
  * progress. Everything the classroom pages need in one place, so the access
  * check cannot be forgotten by a new page.
  */
-export async function loadCourseForUser(slug: string, user: { id: string; tier: number }) {
+export async function loadCourseForUser(slug: string, user: { id: string; tier: number; role?: UserRole }) {
   const course = await db.course.findUnique({
     where: { slug },
     include: {
@@ -58,8 +59,8 @@ export async function loadCourseForUser(slug: string, user: { id: string; tier: 
       : Promise.resolve([]),
   ]);
 
-  const unlocked = canAccessCourse({ tier: user.tier, course, entitlements });
-  const lock: LockReason = lockReason({ tier: user.tier, course, entitlements });
+  const unlocked = canAccessCourse({ tier: user.tier, role: user.role, course, entitlements });
+  const lock: LockReason = lockReason({ tier: user.tier, role: user.role, course, entitlements });
 
   const progressByLesson = new Map(progress.map((p) => [p.lessonId, p]));
 
@@ -89,7 +90,7 @@ export async function loadCourseForUser(slug: string, user: { id: string; tier: 
  * probing request. Callers that want to render a paywall use loadCourseForUser
  * and branch on `unlocked` instead.
  */
-export async function assertCourseAccess(courseId: string, user: { id: string; tier: number }) {
+export async function assertCourseAccess(courseId: string, user: { id: string; tier: number; role?: UserRole }) {
   const course = await db.course.findUnique({
     where: { id: courseId },
     select: { id: true, group: true, published: true },
@@ -101,7 +102,7 @@ export async function assertCourseAccess(courseId: string, user: { id: string; t
     select: { courseId: true, expiresAt: true },
   });
 
-  if (!canAccessCourse({ tier: user.tier, course, entitlements })) notFound();
+  if (!canAccessCourse({ tier: user.tier, role: user.role, course, entitlements })) notFound();
   return course;
 }
 

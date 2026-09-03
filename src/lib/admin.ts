@@ -14,6 +14,6 @@ import { getSessionUser, type SessionUser } from '@/lib/auth';
 export async function requireOwner(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect('/signin');
-  if (!user.isOwner) notFound();
+  if (user.role !== 'owner') notFound();
   return user;
 }

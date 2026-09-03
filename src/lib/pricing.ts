@@ -10,6 +10,7 @@
  * path accepts a price from the browser.
  */
 import { db } from '@/lib/db';
+import type { UserRole } from '@/generated/prisma/enums';
 import { canAccessCourse, discountedCents } from '@/lib/access';
 
 export type PurchaseRequest =
@@ -31,7 +32,7 @@ export type PricedLine = {
 export type PriceResult = { ok: true; line: PricedLine } | { ok: false; reason: string };
 
 export async function pricePurchase(
-  user: { id: string; tier: number },
+  user: { id: string; tier: number; role?: UserRole },
   req: PurchaseRequest
 ): Promise<PriceResult> {
   if (req.kind === 'course') {
@@ -48,7 +49,7 @@ export async function pricePurchase(
 
     // Refuse to sell access someone already has — bought outright, or included
     // with their tier.
-    if (canAccessCourse({ tier: user.tier, course, entitlements })) {
+    if (canAccessCourse({ tier: user.tier, role: user.role, course, entitlements })) {
       return { ok: false, reason: 'You already have access to this course.' };
     }
 

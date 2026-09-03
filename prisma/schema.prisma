@@ -37,15 +37,37 @@ model User {
   displayName String?
   phone       String?
   company     String?
-  role        String? // job title, e.g. "Lead technician"
+  /// Job title, e.g. "Lead technician". Renamed from `role`, which now means
+  /// the account type — the two were never the same thing.
+  jobTitle    String?
   city        String?
   website     String?
   bio         String?
 
   /// Ordinal 1–4. See the invariant note at the top of this file.
+  ///
+  /// Written only by recalcUserTier(), which derives it from subscriptions.
+  /// Never set this directly — set tierOverride instead.
   tier         Int     @default(1)
-  isOwner      Boolean @default(false)
-  isInstructor Boolean @default(false)
+
+  /// A tier set by hand by the owner, which wins over what the member pays for.
+  ///
+  /// Needed because `tier` is derived: without this, an owner comping someone
+  /// to Pro would be silently reverted by the next subscription webhook. It is
+  /// nullable rather than a flag so that clearing it hands the member straight
+  /// back to what they actually pay for.
+  tierOverride       Int?
+  tierOverrideAt     DateTime?
+  /// Why, in the owner's words. Shown next to the override so a future reader
+  /// knows whether it is still meant to apply.
+  tierOverrideReason String?
+  /// What kind of account this is — staff or member.
+  ///
+  /// Deliberately separate from `tier`. Tier says what a member *pays for*;
+  /// role says what someone *is*. Running the school was previously expressed
+  /// by parking Tom at tier 4, which made the owner look like a Crew Leader
+  /// subscriber in every list, label and report. Staff carry no tier.
+  role UserRole @default(member)
 
   // Onboarding (4 steps in the prototype)
   onboardedAt      DateTime?
@@ -296,6 +318,15 @@ model QuizAttempt {
 // ─────────────────────────────────────────────────────────────
 // Enrolment, entitlement, progress
 // ─────────────────────────────────────────────────────────────
+
+/// Account type. `owner` is a superset of `instructor` — whoever runs the
+/// school can also teach — so this is one value rather than a set of flags
+/// that can disagree with each other.
+enum UserRole {
+  member
+  instructor
+  owner
+}
 
 enum EntitlementSource {
   /// Bought outright — one year of access from the purchase date.

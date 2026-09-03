@@ -17,6 +17,7 @@
  * No `server-only`: the test suite calls these directly.
  */
 import { db } from '@/lib/db';
+import type { UserRole } from '@/generated/prisma/enums';
 
 export type Notice = {
   id: string;
@@ -53,7 +54,7 @@ function inDays(n: number): string {
 export async function noticesFor(
   user: {
     id: string;
-    isOwner: boolean;
+    role: UserRole;
     emailVerifiedAt: Date | null;
     notificationsReadAt: Date | null;
     createdAt?: Date;
@@ -95,7 +96,7 @@ export async function noticesFor(
     }),
 
     // Owner only: someone paid and did not get what they paid for.
-    user.isOwner
+    user.role === 'owner'
       ? db.order.findMany({
           where: { status: 'completed', fulfilledAt: null },
           select: { id: true, capturedAt: true, createdAt: true },
@@ -191,7 +192,7 @@ export async function noticesFor(
 /** Just the badge number — the layout renders on every page, so keep it cheap. */
 export async function unreadNoticeCount(user: {
   id: string;
-  isOwner: boolean;
+  role: UserRole;
   emailVerifiedAt: Date | null;
   notificationsReadAt: Date | null;
 }): Promise<number> {

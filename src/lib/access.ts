@@ -10,7 +10,25 @@
  *   - Course access = purchased, OR (tier >= 2 AND group === 'cec').
  *     IICRC certification courses stay a la carte at every tier.
  */
-import type { CourseGroup } from '@/generated/prisma/enums';
+import type { CourseGroup, UserRole } from '@/generated/prisma/enums';
+
+/**
+ * Staff run the school; members buy from it.
+ *
+ * The distinction used to be a boolean plus a tier of 4, which made the owner
+ * read as a Crew Leader subscriber everywhere. Role and tier are now separate
+ * questions: what someone *is*, and what they *pay for*.
+ */
+export function isStaff(role: UserRole): boolean {
+  return role === 'owner' || role === 'instructor';
+}
+
+/** How to name an account in the UI. Staff are named by role, not by tier. */
+export function roleLabel(role: UserRole, tier: number): string {
+  if (role === 'owner') return 'Owner';
+  if (role === 'instructor') return 'Instructor';
+  return TIER_LABEL[tier] ?? `Tier ${tier}`;
+}
 
 export const TIER = {
   COMMUNITY: 1,
@@ -86,6 +104,19 @@ export function tierIncludesCourse(tier: number, group: CourseGroup): boolean {
   return tier >= TIER.PRO && group === 'cec';
 }
 
+/**
+ * Whether being staff alone unlocks a course.
+ *
+ * Exactly what the CEC library gave the owner back when they were parked at
+ * tier 4 — no more. **IICRC certification courses stay locked for staff too.**
+ * That is not an oversight: CLAUDE.md is explicit that an owner seeing an IICRC
+ * course unlocked without an entitlement is a bug, because certification has to
+ * be earned and paid for by everyone, including the person who runs the school.
+ */
+export function staffIncludesCourse(role: UserRole, group: CourseGroup): boolean {
+  return isStaff(role) && group === 'cec';
+}
+
 export type EntitlementLike = {
   courseId: string;
   expiresAt: Date | null;
@@ -98,18 +129,20 @@ export type EntitlementLike = {
  */
 export function canAccessCourse(args: {
   tier: number;
+  /** Absent is treated as a plain member — callers that predate roles still work. */
+  role?: UserRole;
   course: { id: string; group: CourseGroup };
   entitlements: EntitlementLike[];
   now?: Date;
 }): boolean {
-  const { tier, course, entitlements, now = new Date() } = args;
+  const { tier, role = 'member', course, entitlements, now = new Date() } = args;
 
   const owned = entitlements.some(
     (e) => e.courseId === course.id && (e.expiresAt === null || e.expiresAt > now)
   );
   if (owned) return true;
 
-  return tierIncludesCourse(tier, course.group);
+  return tierIncludesCourse(tier, course.group) || staffIncludesCourse(role, course.group);
 }
 
 /** Why a course is locked, for the paywall copy. */
@@ -117,6 +150,7 @@ export type LockReason = 'purchase-required' | 'upgrade-or-purchase' | null;
 
 export function lockReason(args: {
   tier: number;
+  role?: UserRole;
   course: { id: string; group: CourseGroup };
   entitlements: EntitlementLike[];
 }): LockReason {

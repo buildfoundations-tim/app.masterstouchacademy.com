@@ -28,7 +28,7 @@ async function main() {
 
   const user = await db.user.findUnique({
     where: { email },
-    select: { id: true, email: true, firstName: true, lastName: true, isOwner: true, tier: true },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, tier: true },
   });
 
   if (!user) {
@@ -37,7 +37,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (user.isOwner) {
+  if (user.role === 'owner') {
     console.log(`${user.email} is already an owner.`);
     return;
   }
@@ -45,17 +45,18 @@ async function main() {
   const updated = await db.user.update({
     where: { id: user.id },
     data: {
-      isOwner: true,
-      isInstructor: true,
-      // Owners are exempt from tier being derived from subscriptions
-      // (see recalcUserTier), so this sticks without anyone paying.
-      tier: 4,
+      // `owner` is a superset of `instructor` — one value, not two flags.
+      role: 'owner',
+      // Staff carry no membership tier. The owner used to be parked at 4,
+      // which made them read as a Crew Leader subscriber everywhere; their
+      // access comes from their role now. See isStaff() in src/lib/access.ts.
+      tier: 1,
     },
-    select: { email: true, firstName: true, lastName: true, tier: true, isOwner: true },
+    select: { email: true, firstName: true, lastName: true, tier: true, role: true },
   });
 
   console.log(`Promoted ${updated.firstName} ${updated.lastName} <${updated.email}>`);
-  console.log(`  isOwner: ${updated.isOwner}  tier: ${updated.tier}`);
+  console.log(`  role: ${updated.role}  tier: ${updated.tier} (staff carry no membership)`);
   console.log('They can now reach /admin/classes.');
 }
 

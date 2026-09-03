@@ -14,7 +14,7 @@ import { getSessionUser } from '@/lib/auth';
  */
 export default async function AdminLayout({ children }: LayoutProps<'/'>) {
   const user = await getSessionUser();
-  if (!user?.isOwner) notFound();
+  if (user?.role !== 'owner') notFound();
 
   return <>{children}</>;
 }

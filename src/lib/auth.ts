@@ -13,6 +13,8 @@
  */
 import 'server-only';
 
+import type { UserRole } from '@/generated/prisma/enums';
+
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
@@ -86,8 +88,8 @@ export type SessionUser = {
   lastName: string;
   displayName: string | null;
   tier: number;
-  isOwner: boolean;
-  isInstructor: boolean;
+  /** What kind of account this is. Separate from `tier`, which is what they pay for. */
+  role: UserRole;
   onboardedAt: Date | null;
   emailVerifiedAt: Date | null;
   notificationsReadAt: Date | null;
@@ -116,8 +118,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
           lastName: true,
           displayName: true,
           tier: true,
-          isOwner: true,
-          isInstructor: true,
+          role: true,
           onboardedAt: true,
           emailVerifiedAt: true,
           notificationsReadAt: true,

@@ -1,8 +1,9 @@
 import 'server-only';
 
 import { db } from '@/lib/db';
+import { recalcUserTier } from '@/lib/tier';
 import { getSubscription } from '@/lib/paypal';
-import { findPlanByKey, mapStatus, tierFromSubscriptions } from '@/lib/billing';
+import { findPlanByKey, mapStatus } from '@/lib/billing';
 
 /**
  * Reconcile one subscription against PayPal and re-derive the member's tier.
@@ -58,30 +59,6 @@ export async function syncSubscription(paypalSubscriptionId: string): Promise<{
 }
 
 /**
- * Recompute a member's tier from their subscriptions and store it.
- *
- * User.tier is a denormalisation of "what are they paying for right now" —
- * kept because every access check reads it. This is what keeps it honest.
- * Owners are exempt: Tom's tier is set by hand and is not bought.
- */
-export async function recalcUserTier(userId: string): Promise<number> {
-  const [user, subs] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { isOwner: true, tier: true } }),
-    db.subscription.findMany({ where: { userId }, select: { status: true, tier: true } }),
-  ]);
-
-  if (!user) return 1;
-  if (user.isOwner) return user.tier;
-
-  const tier = tierFromSubscriptions(subs);
-
-  if (tier !== user.tier) {
-    await db.user.update({ where: { id: userId }, data: { tier } });
-  }
-  return tier;
-}
-
-/**
  * Record a subscription we just created at PayPal, before the member approves.
  *
  * Stored at approval_pending so an approval webhook arriving moments later has
@@ -127,3 +104,8 @@ export async function activeSubscription(userId: string) {
     },
   });
 }
+
+// recalcUserTier lives in @/lib/tier (no server-only) so the checks can run the
+// real function — the same reason pricing.ts and refunds.ts are split out.
+// Re-exported so callers keep one import site.
+export { recalcUserTier } from '@/lib/tier';

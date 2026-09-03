@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import type { UserRole } from '@/generated/prisma/enums';
+
 /**
  * Left navigation. Client-side only so the active item can be derived from the
  * pathname. Identity and sign-out live in the app bar's account menu, not
@@ -85,13 +87,7 @@ const ACCOUNT: Item[] = [
   },
 ];
 
-export function Sidebar({
-  isOwner,
-  isInstructor,
-}: {
-  isOwner: boolean;
-  isInstructor: boolean;
-}) {
+export function Sidebar({ role }: { role: UserRole }) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -129,9 +125,21 @@ export function Sidebar({
             the page did and 404'd — a nav entry is a promise, so it stays out
             until /instructor exists. See docs/roadmap.md, phase 5. */}
 
-        {isOwner ? (
+        {role === 'owner' ? (
           <>
             <div className="sidebar__group">Admin</div>
+            {renderLink({
+              href: '/admin/members',
+              label: 'Members',
+              icon: icon(
+                <>
+                  <circle cx="9" cy="8" r="3.4" />
+                  <path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+                  <path d="M16 11a3 3 0 100-6" />
+                  <path d="M18 20c0-2.4-1-4.2-2.6-5.2" />
+                </>
+              ),
+            })}
             {renderLink({
               href: '/admin/classes',
               label: 'Classes',
@@ -151,7 +159,7 @@ export function Sidebar({
                 </>
               ),
             })}
-            {/* Admin → Members is phase 2; the link 404'd until then. */}
+
           </>
         ) : null}
       </nav>

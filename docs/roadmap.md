@@ -85,7 +85,10 @@ deliveries.
 
 Tom cannot run the school from the app yet; he can only edit class dates.
 
-- **Members** — list, search, view a member, adjust tier by hand, grant a course.
+- ~~**Members**~~ — **done.** List, search and filter; a detail view with a hand-set tier
+  (`User.tierOverride`, which survives subscription webhooks), course grants that sit alongside
+  purchases, and the member's subscriptions, seats, certificates and orders in one place.
+  The owner is now a role rather than a tier-4 Crew Leader; see `isStaff()` in `src/lib/access.ts`.
 - **Orders** — what was bought and what a payment granted. Refunds already
   land here from PayPal; what is missing is issuing one from this screen, and
   resolving a flagged partial refund by hand.

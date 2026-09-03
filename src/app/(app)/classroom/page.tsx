@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { db } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
-import { canAccessCourse, lockReason, TIER_LABEL, TIER } from '@/lib/access';
+import { canAccessCourse, lockReason, TIER_LABEL, TIER, isStaff } from '@/lib/access';
 
 export const metadata = { title: 'Classroom' };
 
@@ -44,8 +44,8 @@ export default async function ClassroomPage({
 
   const decorated = courses.map((course) => ({
     ...course,
-    unlocked: canAccessCourse({ tier: user.tier, course, entitlements }),
-    lock: lockReason({ tier: user.tier, course, entitlements }),
+    unlocked: canAccessCourse({ tier: user.tier, role: user.role, course, entitlements }),
+    lock: lockReason({ tier: user.tier, role: user.role, course, entitlements }),
     percent: progressByCourse.get(course.id) ?? 0,
   }));
 
@@ -80,7 +80,10 @@ export default async function ClassroomPage({
           </p>
         ) : null}
 
-        {user.tier < TIER.PRO ? (
+        {/* Staff are not prospects. Selling a Pro membership to the person who
+            runs the school is exactly the confusion that keeping role separate
+            from tier is meant to end. */}
+        {!isStaff(user.role) && user.tier < TIER.PRO ? (
           <p className="alert alert--info">
             You&rsquo;re on <strong>{TIER_LABEL[user.tier]}</strong>. Pro membership opens the whole
             continuing education library — {cec.length} courses — for $69 a month.{' '}

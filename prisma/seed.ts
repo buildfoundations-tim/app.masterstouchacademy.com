@@ -189,11 +189,12 @@ async function main() {
       lastName: 'Cermak',
       displayName: 'Tom',
       company: 'Masters Touch Academy',
-      role: 'Founder and lead instructor',
+      jobTitle: 'Founder and lead instructor',
       city: 'Cleveland, OH',
-      tier: 4,
-      isOwner: true,
-      isInstructor: true,
+      // Staff carry no membership tier — Tom runs the school, he does not
+      // subscribe to it. His course access comes from `role`; see isStaff().
+      tier: 1,
+      role: 'owner',
       onboardedAt: new Date(),
       settings: { create: {} },
     },
@@ -370,7 +371,7 @@ async function main() {
 
   if (seedDemoUsers) {
     console.log('\nDone. Sign in with:');
-    console.log('  tom@masterstouchacademy.com  (owner, tier 4)');
+    console.log('  tom@masterstouchacademy.com  (owner — staff, no membership tier)');
     console.log('  pro@example.com              (Pro, tier 2)');
     console.log('  community@example.com        (Community, tier 1)');
     console.log(`  password: ${process.env.SEED_DEMO_PASSWORD || 'academy-dev-2026'}`);
