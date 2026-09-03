@@ -84,6 +84,11 @@ export async function GET() {
     smtp:
       transport === 'smtp'
         ? {
+            // The hostname itself, not just whether it is set. It is not a
+            // secret, and a stale value here is invisible otherwise — an env
+            // change only takes effect on the next build, which is exactly the
+            // trap that made a fixed setting look unfixed.
+            host: process.env.SMTP_HOST ?? null,
             hostSet: Boolean(process.env.SMTP_HOST),
             portSet: Boolean(process.env.SMTP_PORT),
             userSet: Boolean(process.env.SMTP_USER),
