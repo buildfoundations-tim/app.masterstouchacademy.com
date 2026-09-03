@@ -77,10 +77,12 @@ const ACCOUNT: Item[] = [
 export function Sidebar({
   isOwner,
   isInstructor,
+  cartCount = 0,
   children,
 }: {
   isOwner: boolean;
   isInstructor: boolean;
+  cartCount?: number;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -110,6 +112,19 @@ export function Sidebar({
         {MAIN.map(renderLink)}
 
         <div className="sidebar__group">Account</div>
+        <Link
+          href="/cart"
+          className="navlink"
+          aria-current={isActive('/cart') ? 'page' : undefined}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="9" cy="20" r="1.4" />
+            <circle cx="18" cy="20" r="1.4" />
+            <path d="M2 3h3l2.4 12.2a1.6 1.6 0 001.6 1.3h8.4a1.6 1.6 0 001.6-1.3L21 7H6" />
+          </svg>
+          <span>Cart</span>
+          {cartCount > 0 ? <span className="navlink__badge">{cartCount}</span> : null}
+        </Link>
         {ACCOUNT.map(renderLink)}
 
         {/* The instructor portal is not built yet. The link lived here before

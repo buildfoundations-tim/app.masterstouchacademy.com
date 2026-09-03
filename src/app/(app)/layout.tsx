@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/auth';
 import { TIER_LABEL } from '@/lib/access';
 import { Sidebar } from '@/components/sidebar';
+import { cartCount } from '@/lib/cart';
 import { signOut } from './actions';
 
 /**
@@ -14,11 +15,13 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
   const user = await getSessionUser();
   if (!user) redirect('/signin');
 
+  const itemsInCart = await cartCount(user.id);
+
   const initials = `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase();
 
   return (
     <div className="shell">
-      <Sidebar isOwner={user.isOwner} isInstructor={user.isInstructor}>
+      <Sidebar isOwner={user.isOwner} isInstructor={user.isInstructor} cartCount={itemsInCart}>
         <div className="sidebar__account">
           <span className="avatar">{initials}</span>
           <div style={{ minWidth: 0, flex: 1 }}>

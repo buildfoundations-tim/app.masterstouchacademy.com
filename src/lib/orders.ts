@@ -152,6 +152,22 @@ export async function settleOrder(paypalOrderId: string): Promise<SettleResult> 
       }
     }
 
+    // Anything just paid for leaves the cart. Scoped to this order's lines, so
+    // a member who added more while checking out keeps those.
+    const boughtCourseIds = order.items.map((i) => i.courseId).filter(Boolean) as string[];
+    const boughtClassIds = order.items.map((i) => i.classId).filter(Boolean) as string[];
+    if (boughtCourseIds.length || boughtClassIds.length) {
+      await tx.cartItem.deleteMany({
+        where: {
+          userId: order.userId,
+          OR: [
+            ...(boughtCourseIds.length ? [{ courseId: { in: boughtCourseIds } }] : []),
+            ...(boughtClassIds.length ? [{ classId: { in: boughtClassIds } }] : []),
+          ],
+        },
+      });
+    }
+
     await tx.order.update({
       where: { id: order.id },
       data: {

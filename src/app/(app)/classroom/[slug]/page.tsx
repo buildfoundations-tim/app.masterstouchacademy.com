@@ -7,8 +7,8 @@ import { TIER_LABEL, classDiscount, discountedCents } from '@/lib/access';
 import { paypalConfigured } from '@/lib/paypal';
 import { money } from '@/lib/format';
 import { db } from '@/lib/db';
-import { startPurchase } from '@/app/(app)/checkout/actions';
-import { BuyButton } from '@/app/(app)/checkout/buy-button';
+import { addToCart } from '@/app/(app)/cart/actions';
+import { AddToCartButton } from '@/app/(app)/cart/add-button';
 
 export async function generateMetadata({ params }: PageProps<'/classroom/[slug]'>) {
   const { slug } = await params;
@@ -166,14 +166,17 @@ export default async function CoursePage({ params }: PageProps<'/classroom/[slug
                   )}
                 </p>
                 <div className="paywall-actions">
-                  <BuyButton
-                    action={startPurchase}
+                  <AddToCartButton
+                    action={addToCart}
                     fields={{ kind: 'course', courseId: course.id }}
-                    label={`Buy this course — ${money(discountedCents(course.priceCents, user.tier))}`}
+                    label={`Add to cart — ${money(discountedCents(course.priceCents, user.tier))}`}
                     className="btn btn--dark"
                     disabled={!purchasable}
                     disabledLabel="Purchasing is not available yet"
                   />
+                  <Link className="btn btn--outline" href="/cart">
+                    View cart
+                  </Link>
                   {lock === 'upgrade-or-purchase' ? (
                     <Link className="btn btn--outline" href="/membership">
                       Or go Pro from $69/mo

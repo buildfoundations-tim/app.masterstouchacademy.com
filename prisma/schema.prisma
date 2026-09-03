@@ -70,6 +70,7 @@ model User {
   settings       UserSettings?
   subscriptions  Subscription[]
   orders         Order[]
+  cartItems      CartItem[]
   tokens         VerificationToken[]
 
   /// Crew the user belongs to as a seat holder.
@@ -189,6 +190,7 @@ model Course {
   entitlements    Entitlement[]
   scheduledClasses ScheduledClass[]
   orderItems      OrderItem[]
+  cartItems       CartItem[]
   finalExam       Quiz?           @relation("CourseFinalExam")
 
   @@index([group, published])
@@ -414,6 +416,7 @@ model ScheduledClass {
   bookings   SeatBooking[]
   attendance Attendance[]
   orderItems OrderItem[]
+  cartItems  CartItem[]
 
   @@index([startDate, published])
 }
@@ -612,4 +615,41 @@ model VerificationToken {
 
   @@index([userId, purpose])
   @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cart
+// ─────────────────────────────────────────────────────────────
+//
+// Stores only WHAT is in the cart, never what it costs. Prices are recomputed
+// from the catalog and the member's tier at render and again at checkout, so a
+// price change, a tier change, or a course they meanwhile gained access to is
+// reflected rather than frozen at the moment of adding.
+//
+// Server-side rather than a cookie: members sign in on the truck and again at
+// the desk, and an abandoned cart is worth something to the owner.
+
+model CartItem {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind OrderItemKind
+
+  courseId String?
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  classId String?
+  class   ScheduledClass? @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  /// inperson | virtual, for a class seat.
+  seatMode String?
+
+  addedAt DateTime @default(now())
+
+  /// One line per course. A member cannot buy the same course twice.
+  @@unique([userId, courseId])
+  /// One seat per class — the format can be changed, not doubled up.
+  @@unique([userId, classId])
+  @@index([userId])
 }

@@ -6,8 +6,8 @@ import { db } from '@/lib/db';
 import { classDiscount, discountedCents, TIER_LABEL } from '@/lib/access';
 import { money, dateParts, seatsLabel } from '@/lib/format';
 import { paypalConfigured } from '@/lib/paypal';
-import { startPurchase } from '@/app/(app)/checkout/actions';
-import { BuyButton } from '@/app/(app)/checkout/buy-button';
+import { addToCart } from '@/app/(app)/cart/actions';
+import { AddToCartButton } from '@/app/(app)/cart/add-button';
 
 export const metadata = { title: 'Class schedule' };
 
@@ -135,20 +135,20 @@ export default async function SchedulePage() {
                       ) : null}
                       <div className="seat-buttons">
                         {inPerson !== null && k.mode !== 'virtual' ? (
-                          <BuyButton
-                            action={startPurchase}
+                          <AddToCartButton
+                            action={addToCart}
                             fields={{ kind: 'class_seat', classId: k.id, seatMode: 'inperson' }}
-                            label={full ? 'Fully booked' : 'Book a classroom seat'}
+                            label={full ? 'Fully booked' : 'Add classroom seat'}
                             className="btn btn--dark btn--sm btn--block"
                             disabled={!purchasable || full}
                             disabledLabel={full ? 'Fully booked' : 'Booking unavailable'}
                           />
                         ) : null}
                         {virtual !== null && k.mode !== 'inperson' ? (
-                          <BuyButton
-                            action={startPurchase}
+                          <AddToCartButton
+                            action={addToCart}
                             fields={{ kind: 'class_seat', classId: k.id, seatMode: 'virtual' }}
-                            label="Book a live-stream seat"
+                            label="Add live-stream seat"
                             className="btn btn--outline btn--sm btn--block"
                             disabled={!purchasable}
                             disabledLabel="Booking unavailable"
