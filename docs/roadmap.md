@@ -97,12 +97,15 @@ Tom cannot run the school from the app yet; he can only edit class dates.
   course rather than stored, so correcting a course's hours corrects every past roll — which
   matters because CE hours are the number a member is audited on. Only a booked seat can be
   marked.
-- **Course builder** — modules and lessons without a database client. This is
-  what makes the catalog editable by the client rather than by a developer.
+- ~~**Course builder**~~ — **done.** Courses, modules and lessons are all editable from
+  `/admin/courses`, including reordering and publishing. A course cannot be published with no
+  lessons, and each lesson type must carry its own content. **Not** editable yet: quiz and exam
+  questions — a quiz lesson slot can be created, but its questions still need the database.
+  That is the next thing on this screen.
 
-At the end of this phase `inc/data.php` on the marketing site should read from
-an API here rather than holding its own copy. Right now the two are synced by
-hand and will drift.
+Still open at the end of this phase: `inc/data.php` on the marketing site holds its own copy
+of the catalogue and schedule. Now that both are editable here, this app is the source and that
+file should read from an API rather than being kept in step by hand.
 
 ## Phase 3 — Video
 

@@ -151,6 +151,16 @@ export function Sidebar({ role }: { role: UserRole }) {
               ),
             })}
             {renderLink({
+              href: '/admin/courses',
+              label: 'Courses',
+              icon: icon(
+                <>
+                  <path d="M4 5.5A1.5 1.5 0 015.5 4H11v16H5.5A1.5 1.5 0 014 18.5z" />
+                  <path d="M20 5.5A1.5 1.5 0 0018.5 4H13v16h5.5a1.5 1.5 0 001.5-1.5z" />
+                </>
+              ),
+            })}
+            {renderLink({
               href: '/admin/attendance',
               label: 'Attendance',
               icon: icon(
