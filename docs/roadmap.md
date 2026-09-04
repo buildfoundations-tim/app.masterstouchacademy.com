@@ -92,7 +92,11 @@ Tom cannot run the school from the app yet; he can only edit class dates.
 - **Orders** — what was bought and what a payment granted. Refunds already
   land here from PayPal; what is missing is issuing one from this screen, and
   resolving a flagged partial refund by hand.
-- **Attendance** — roll call per class, which drives certification credit.
+- ~~**Attendance**~~ — **done.** Roll call per class: present awards the course's CE hours,
+  late awards them less two, absent awards none. Hours are derived from the mark and the
+  course rather than stored, so correcting a course's hours corrects every past roll — which
+  matters because CE hours are the number a member is audited on. Only a booked seat can be
+  marked.
 - **Course builder** — modules and lessons without a database client. This is
   what makes the catalog editable by the client rather than by a developer.
 

@@ -128,7 +128,7 @@ verification, password reset), the classroom, lesson player and progress, the fi
 certificates, the class schedule, owner class admin, and PayPal for both subscriptions and
 one-time purchases.
 
-**Not built**: most of the 13-section Admin (Classes, Orders and Members exist), community, marketplace,
+**Not built**: most of the 13-section Admin (Classes, Orders, Members and Attendance exist), community, marketplace,
 consulting, messaging, the AI assistant, crew management, and the instructor portal. The sidebar
 links only pages that exist; `/instructor` is deliberately absent until it is built.
 

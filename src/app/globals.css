@@ -801,4 +801,45 @@ textarea.input { line-height: 1.6; resize: vertical; }
 .mtable__flag { display: block; font-size: 10.5px; margin-top: 3px; }
 
 .avatar--light { background: var(--surface-tint); color: var(--muted); width: 28px; height: 28px; font-size: 11px; }
+
+/* ── Roll call ───────────────────────────────────────────── */
+.chiprow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface-warm);
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  text-decoration: none;
+}
+.chip:hover { border-color: var(--border-strong); }
+.chip.is-on { background: var(--dark); border-color: var(--dark); color: #fff; }
+.chip__count { font-weight: 400; font-size: 11.5px; opacity: .75; }
+
+.rtable { min-width: 840px; }
+.rtable__head, .rtable__row {
+  display: grid;
+  grid-template-columns: minmax(190px, 2fr) minmax(140px, 1.6fr) 120px 78px 268px;
+  gap: 12px; align-items: center; padding: 11px 20px;
+}
+.rtable__head {
+  background: var(--bg);
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--fainter);
+}
+.rtable__row { border-top: 1px solid var(--surface-tint); font-size: 13px; }
+
+/* Each mark is its own form, so the row is a flex strip of one-button forms. */
+.marks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.mark {
+  padding: 6px 13px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surface-warm);
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+  cursor: pointer;
+}
+.mark:hover { border-color: var(--border-strong); }
+/* Colour only lands on the chosen mark — three tinted buttons on every row
+   would make a finished roll unreadable at a glance. */
+.mark--present.is-on { background: var(--success-tint); border-color: var(--success); color: var(--success); }
+.mark--late.is-on { background: #fdf4e3; border-color: var(--gold-deep); color: var(--gold-ink); }
+.mark--absent.is-on { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
 .admin-search .input { flex: 1; min-width: 220px; }
